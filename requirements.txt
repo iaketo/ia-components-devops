@@ -1,6 +1,9 @@
 groq>=0.9.0
 python-dotenv>=1.0.0
-requests>=2.31.0
+requests>=2.32.0 #hotfix: version anterior (2.31.0) 
+                 #HOTFIX
+                 #figuraba de manera local en el requirements.txt, 
+                 #por lo que se actualiza a la version 2.32.0
 sentence-transformers>=2.7.0
 faiss-cpu>=1.8.0
 numpy>=1.26.0
