@@ -167,3 +167,6 @@ def summarize_traces(traces: list[dict[str, Any]]) -> dict[str, Any]:
         "p95_duration_ms": _percentile(durations, 95),
         "slowest_steps": slowest_steps[:5],
     }
+
+#hola estoy probando el repositorio mientras muero de hambre.
+#HOLA, NO FUNCIONA ESTO???
