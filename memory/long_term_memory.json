@@ -1,0 +1,38 @@
+[
+  {
+    "timestamp": "2026-05-16T12:44:11.631291",
+    "componentes": {
+      "cpu": 44,
+      "gpu": 1,
+      "ram": 18,
+      "mb": 19,
+      "case": 29
+    },
+    "resultado": "1. **Sí**, el cuello de botella se encuentra en la **GPU GeForce RTX 4060** en relación con la **CPU Ryzen 5 7600X**.\n2. La explicación técnica es que la **GPU GeForce RTX 4060** es una tarjeta gráfica potente que puede requerir una mayor cantidad de procesamiento por parte de la **CPU Ryzen 5 7600X**. Sin embargo, la **CPU Ryzen 5 7600X** puede no ser capaz de proporcionar la cantidad de procesamiento necesario para que la **GPU GeForce RTX 4060** funcione al máximo, especialmente en aplicaciones que requieren un alto rendimiento de procesamiento, como el renderizado 3D y la edición de video.\n3. **No crítico**, el sistema funcionará, pero no al máximo rendimiento posible.\n4. La recomendación concreta es considerar una **CPU Ryzen 7 7700X** o superior para aprovechar al máximo el potencial de la **GPU GeForce RTX 4060**.\n5. **80**, el puntaje de compatibilidad es alto, pero no óptimo debido al cuello de botella mencionado.\n6. \n * **Ryzen 5 7600X** (CPU)\n * **GeForce RTX 4060** (GPU)\n * **Elite 16GB (2 x 8GB) DDR4-3200** (RAM)\n * **ROG Crosshair VIII Hero (Wi-Fi)** (PLACA MADRE)\n * **Meshify C** (GABINETE)\n7. No hay componentes que no existan en la realidad en la lista proporcionada.",
+    "puntaje": null
+  },
+  {
+    "timestamp": "2026-06-27T17:03:33.949102",
+    "componentes": {
+      "cpu": 40,
+      "gpu": 2,
+      "ram": 10,
+      "mb": 23,
+      "case": 32
+    },
+    "resultado": "1. Sí, el cuello de botella se produce en la GPU GeForce RTX 3080 Ti GAMING X TRIO 12GB con el procesador Intel Core i7-13700K en ciertas situaciones de juego a alta resolución o con configuraciones muy exigentes.\n\n2. La explicación técnica se basa en que el procesador Intel Core i7-13700K tiene una velocidad de reloj alta y muchos núcleos, lo que puede generar una gran cantidad de datos para ser procesados por la GPU. La GeForce RTX 3080 Ti, aunque es una tarjeta gráfica potente, puede llegar a ser ligeramente limitada por el procesador en juegos que no están optimizados para aprovechar al máximo la capacidad de la GPU.\n\n3. No crítico, ya que el sistema seguirá funcionando bien en la mayoría de los casos, pero es posible que no se aproveche al máximo el potencial de la GPU en algunos juegos o aplicaciones muy exigentes.\n\n4. La recomendación concreta es ajustar los gráficos y configuraciones de juego para encontrar un equilibrio entre rendimiento y calidad visual, ya que el sistema en sí es muy potente y puede manejar juegos exigentes con algunas compensaciones en la configuración.\n\n5. Puntaje de compatibilidad: 90\n\n6. Listado de componentes seleccionados con compatibilidad individual: \n- Intel Core i7-13700K (CPU)\n- GeForce RTX 3080 Ti GAMING X TRIO 12GB (GPU)\n- Ripjaws V Series 16GB (2 x 8GB) DDR4-3600 (RAM)\n- ROG Strix Z690-E Gaming WiFi 6E (PLACA MADRE)\n- Obsidian Series 500D RGB SE (GABINETE)\n\n7. No hay componentes que no existan en la realidad en la lista proporcionada.",
+    "puntaje": null
+  },
+  {
+    "timestamp": "2026-06-27T21:52:32.822887",
+    "componentes": {
+      "cpu": 43,
+      "gpu": 3,
+      "ram": 11,
+      "mb": 24,
+      "case": 38
+    },
+    "resultado": "1. **Sí**, el cuello de botella se produce en la GPU GeForce RTX 3060 VENTUS 2X 12G OC, ya que la CPU Core i5-13600K puede manejar más carga de trabajo de lo que la GPU puede procesar gráficamente.\n\n2. La explicación técnica se basa en que la CPU Core i5-13600K tiene una arquitectura más avanzada y una mayor cantidad de núcleos y hilos, lo que le permite procesar más instrucciones por ciclo de reloj. Por otro lado, la GPU GeForce RTX 3060, aunque potente, puede llegar a ser limitada por la cantidad de núcleos CUDA y la velocidad de su memoria GDDR6, lo que puede provocar un cuello de botella en juegos o aplicaciones que requieren una gran cantidad de procesamiento gráfico.\n\n3. **No crítico**, ya que el sistema seguirá funcionando, pero es posible que no alcance su máximo rendimiento en juegos o aplicaciones que requieren una gran cantidad de procesamiento gráfico.\n\n4. La recomendación concreta es utilizar la configuración actual para juegos o aplicaciones que no requieren una gran cantidad de procesamiento gráfico, o considerar la posibilidad de actualizar la GPU a un modelo más potente en el futuro si se desea mejorar el rendimiento gráfico.\n\n5. **80**, el puntaje de compatibilidad es alto, ya que todos los componentes son compatibles entre sí, pero el cuello de botella en la GPU puede limitar el rendimiento del sistema.\n\n6. - Core i5-13600K (CPU)\n   - GeForce RTX 3060 VENTUS 2X 12G OC (GPU)\n   - Fury Beast 16GB (2 x 8GB) DDR4-3200 (RAM)\n   - MAG B550 TOMAHAWK (PLACA MADRE)\n   - DF600 Flux (GABINETE)\n\n7. No hay componentes que no existan en la realidad en la configuración proporcionada.",
+    "puntaje": null
+  }
+]

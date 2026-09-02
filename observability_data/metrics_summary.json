@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-06-29T20:22:10.440Z",
+  "total_traces": 14,
+  "successful_traces": 12,
+  "failed_traces": 2,
+  "success_rate": 85.71,
+  "cache_hit_rate": 71.43,
+  "avg_duration_ms": 3019.9,
+  "p95_duration_ms": 10560.22,
+  "slowest_steps": [
+    {
+      "step": "web_search",
+      "avg_duration_ms": 8585.1,
+      "runs": 2,
+      "errors": 0
+    },
+    {
+      "step": "cargar_catalogo",
+      "avg_duration_ms": 7158.51,
+      "runs": 3,
+      "errors": 0
+    },
+    {
+      "step": "llm_sintesis",
+      "avg_duration_ms": 1781.43,
+      "runs": 2,
+      "errors": 0
+    },
+    {
+      "step": "rag_search",
+      "avg_duration_ms": 30.42,
+      "runs": 2,
+      "errors": 0
+    },
+    {
+      "step": "guardar_memoria_largo_plazo",
+      "avg_duration_ms": 1.79,
+      "runs": 2,
+      "errors": 0
+    }
+  ]
+}
