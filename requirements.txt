@@ -13,3 +13,4 @@ langchain-core>=0.2.0
 crewai>=0.63.0
 litellm>=1.40.0
 wikipedia-api>=0.6.0
+pytest>=7.4.0
