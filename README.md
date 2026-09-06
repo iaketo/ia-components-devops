@@ -53,7 +53,3 @@ El archivo `.github/workflows/ci.yml` automatiza:
 2. Configuración del entorno Python 3.11.
 3. Instalación de dependencias (`pip install -r requirements.txt`).
 4. Ejecución de la batería de pruebas (`python -m pytest tests/`).
-
-## Uso de Inteligencia Artificial
-
-Se utilizó Claude (Anthropic) como apoyo para resolver errores de configuración del pipeline de CI/CD, corregir dependencias en `requirements.txt`, y documentar las convenciones del proyecto. Las decisiones de diseño y las conclusiones individuales fueron elaboradas por los integrantes sin apoyo de IA.
