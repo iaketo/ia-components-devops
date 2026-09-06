@@ -4,7 +4,10 @@ requests>=2.32.0 #hotfix: version anterior (2.31.0)
                  #HOTFIX
                  #figuraba de manera local en el requirements.txt, 
                  #por lo que se actualiza a la version 2.32.0
-sentence-transformers>=2.7.0
+sentence-transformers>=6.0.1  #hotfix: version muy antigua (2.7.0) 
+                              #HOTFIX
+                              #figuraba de manera local en el requirements.txt, 
+                              #Se actualiza a la version 6.0.1 (la mas reciente)
 faiss-cpu>=1.8.0
 numpy>=1.26.0
 streamlit>=1.35.0
