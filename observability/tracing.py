@@ -171,3 +171,4 @@ def summarize_traces(traces: list[dict[str, Any]]) -> dict[str, Any]:
 #hola estoy probando el repositorio mientras muero de hambre.
 #HOLA, NO FUNCIONA ESTO???
 #NICOLAS NO SEAS INFORMAL PORFA XD.
+#PD: NO REQUIERE MIDIFICACIONES ESTE, ESTA HECHO HACE POCO.
