@@ -11,9 +11,6 @@ Se optó por GitFlow como modelo de ramificación:
 
 Se utiliza el formato de Conventional Commits:
 
-\`\`\`
-<tipo>(<alcance opcional>): <descripción breve en presente>
-\`\`\`
 
 | Tipo       | Uso                                              |
 |------------|---------------------------------------------------|
