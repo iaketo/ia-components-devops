@@ -50,3 +50,14 @@ El archivo `.github/workflows/ci.yml` automatiza:
 2. Configuración del entorno Python 3.11.
 3. Instalación de dependencias (`pip install -r requirements.txt`).
 4. Ejecución de la batería de pruebas (`python -m pytest tests/`).
+
+## Uso de Inteligencia Artificial
+
+Se utilizó Claude (Anthropic) como apoyo para resolver errores de configuración del pipeline de CI/CD, corregir dependencias en `requirements.txt`, y documentar las convenciones del proyecto. Las decisiones de diseño y las conclusiones individuales fueron elaboradas por los propios integrantes.
+
+
+##Reflexiones##
+[Nicolás Troncoso]
+Al principio me costó entender GitFlow, sobre todo diferenciar main de develop y saber desde qué rama debía crear cada tipo de trabajo (feature o hotfix). Un momento que me ayudó a entenderlo de verdad fue cuando tuvimos que resolver un conflicto de merge en requirements.txt, donde dos cambios distintos (un hotfix mío y una actualización de mi compañero) chocaban en el mismo archivo — ahí entendí en la práctica por qué Git necesita que alguien decida manualmente qué versión final debe quedar. También aprendí lo importante que es revisar el código de otra persona antes de integrarlo: no es solo un trámite, sino una forma real de detectar errores o inconsistencias antes de que lleguen a producción.
+
+[Álvaro Eyzaguirre]
