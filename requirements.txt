@@ -1,16 +1,2 @@
-groq>=0.9.0
-python-dotenv>=1.0.0
-requests>=2.34.2  # hotfix: version original 2.28.0 tenia vulnerabilidad; actualizada a 2.32.0 por hotfix, luego a 2.34.2
-sentence-transformers>=6.0.1  # hotfix: version anterior 2.7.0 era muy antigua, actualizada a 6.0.1
-faiss-cpu>=1.8.0
-numpy>=1.26.0
-streamlit>=1.35.0
-flask>=3.0.0
-flask-cors>=4.0.0
-langchain>=0.2.0
-langchain-groq>=0.1.0
-langchain-core>=0.2.0
-crewai>=0.63.0
-litellm>=1.40.0
-wikipedia-api>=0.6.0
-pytest>=7.4.0
+# El agente usa Groq directamente y FAISS; no usa CrewAI, LangChain ni Flask.
+-r requirements-docker.txt

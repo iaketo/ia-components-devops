@@ -27,7 +27,7 @@ def buscar_en_google(query: str, num_resultados: int = 3) -> str:
     Returns:
         String con los snippets más relevantes, o mensaje de error.
     """
-    if not SERP_API_KEY or SERP_API_KEY == "tu_serp_api_key_aqui":
+    if not SERP_API_KEY or SERP_API_KEY in {"dummy", "tu_serp_api_key_aqui"}:
         return _fallback_sin_serp(query)
 
     try:
@@ -40,6 +40,7 @@ def buscar_en_google(query: str, num_resultados: int = 3) -> str:
         }
 
         response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
         data = response.json()
 
         snippets = []
@@ -51,7 +52,8 @@ def buscar_en_google(query: str, num_resultados: int = 3) -> str:
         return "\n".join(snippets) if snippets else "Sin resultados web disponibles."
 
     except Exception as e:
-        return f"Error en búsqueda web: {str(e)}"
+        # Las URLs de SerpAPI contienen api_key: no devolver mensajes HTTP crudos.
+        return f"Error en búsqueda web: {type(e).__name__}"
 
 
 def _fallback_sin_serp(query: str) -> str:

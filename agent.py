@@ -6,7 +6,7 @@ Agente principal de análisis de compatibilidad de hardware.
 Integra:
   - Herramienta de consulta: RAG semántico sobre catálogo de productos.
   - Herramienta de consulta: búsqueda web (SerpAPI).
-  - Herramienta de razonamiento: LLM (Groq llama-3.3-70b-versatile).
+  - Herramienta de razonamiento: LLM (Groq, modelo configurable).
   - Memoria de corto plazo: historial conversacional en sesión.
   - Memoria de largo plazo: análisis persistidos en JSON.
   - Planificación: ciclo Plan → Execute → Synthesize antes de responder.
@@ -71,11 +71,20 @@ class HardwareAgent:
         """
         try:
             response = requests.get(API_URL, timeout=10)
-            self.productos = response.json()
+            response.raise_for_status()
+            productos = response.json()
+            if not isinstance(productos, list) or not all(isinstance(p, dict) for p in productos):
+                raise ValueError("El catálogo debe ser una lista de productos.")
+            if not productos:
+                raise ValueError("El catálogo está vacío.")
+            self.productos = productos
             self.rag.construir_indice(self.productos)
             self._catalogo_cargado = True
             return self.productos
         except Exception as e:
+            self.productos = []
+            self._catalogo_cargado = False
+            self.rag.construir_indice([])
             print(f" Error cargando catálogo: {e}")
             return []
 

@@ -21,3 +21,6 @@ docs/
 tests/
 install.bat
 run.bat
+reports/
+coverage.xml
+.scannerwork/

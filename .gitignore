@@ -33,3 +33,6 @@ observability_data/*.jsonl
 
 # Memoria generada
 memory/long_term_memory.json
+reports/
+coverage.xml
+.scannerwork/

@@ -6,8 +6,13 @@ Centraliza el modelo para evitar cargas múltiples.
 """
 
 from sentence_transformers import SentenceTransformer
+from functools import lru_cache
 
-_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+@lru_cache(maxsize=1)
+def get_model():
+    """Carga y comparte el modelo solo cuando se necesitan embeddings."""
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
 
 def embed_text(text: str):
@@ -20,7 +25,7 @@ def embed_text(text: str):
     Returns:
         Vector numpy del embedding.
     """
-    return _model.encode(text)
+    return get_model().encode(text)
 
 
 def embed_batch(texts: list[str]):
@@ -33,4 +38,4 @@ def embed_batch(texts: list[str]):
     Returns:
         Array numpy de embeddings.
     """
-    return _model.encode(texts, show_progress_bar=False)
+    return get_model().encode(texts, show_progress_bar=False)

@@ -10,12 +10,8 @@ IL2.4 - Recuperación de contexto semántico para continuidad del flujo.
 """
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
+from utils.embeddings import get_model
 import faiss
-
-# Modelo de embeddings liviano y eficiente
-_model = SentenceTransformer("all-MiniLM-L6-v2")
-
 
 class RAG:
     """
@@ -42,7 +38,11 @@ class RAG:
             for p in productos
         ]
 
-        embeddings = _model.encode(self.textos, show_progress_bar=False)
+        self.index = None
+        if not self.textos:
+            return
+
+        embeddings = get_model().encode(self.textos, show_progress_bar=False)
         dimension = embeddings.shape[1]
 
         self.index = faiss.IndexFlatL2(dimension)
@@ -62,10 +62,14 @@ class RAG:
         if self.index is None or not self.textos:
             return "Índice RAG no construido."
 
-        query_embedding = _model.encode([query], show_progress_bar=False)
+        if k <= 0:
+            return ""
+        k = min(k, len(self.textos))
+
+        query_embedding = get_model().encode([query], show_progress_bar=False)
         _, indices = self.index.search(
             np.array(query_embedding, dtype="float32"), k
         )
 
-        resultados = [self.textos[i] for i in indices[0] if i < len(self.textos)]
+        resultados = [self.textos[i] for i in indices[0] if 0 <= i < len(self.textos)]
         return "\n".join(resultados)

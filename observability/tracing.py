@@ -10,7 +10,7 @@ from typing import Any, Iterator
 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OBSERVABILITY_DIR = os.path.join(PROJECT_ROOT, "observability_data")
+OBSERVABILITY_DIR = os.path.join(os.getenv("APP_DATA_DIR", PROJECT_ROOT), "observability_data")
 TRACES_FILE = os.path.join(OBSERVABILITY_DIR, "traces.jsonl")
 SUMMARY_FILE = os.path.join(OBSERVABILITY_DIR, "metrics_summary.json")
 
