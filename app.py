@@ -18,7 +18,7 @@ from observability import load_traces, summarize_traces
 
 # Asegurar que el path incluye el directorio del proyecto
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(override=True)
+load_dotenv()
 
 # ─────────────────────────────────────────────────────────────
 # CONFIGURACIÓN DE PÁGINA
@@ -207,7 +207,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 🔧 Herramientas activas")
     st.markdown("- ✅ RAG (FAISS + SentenceTransformers)")
-    st.markdown("- ✅ LLM (Groq llama-3.3-70b)")
+    st.markdown("- ✅ LLM (Groq)")
     st.markdown("- ✅ Web Search (SerpAPI)")
     st.markdown("- ✅ Memoria corto/largo plazo")
 

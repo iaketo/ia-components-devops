@@ -16,7 +16,10 @@ from datetime import datetime
 from typing import Optional
 
 
-MEMORY_FILE = os.path.join(os.path.dirname(__file__), "long_term_memory.json")
+MEMORY_FILE = os.path.join(
+    os.getenv("APP_DATA_DIR", os.path.dirname(os.path.dirname(__file__))),
+    "memory", "long_term_memory.json"
+)
 
 
 class MemoryManager:

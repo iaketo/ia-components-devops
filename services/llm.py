@@ -1,7 +1,7 @@
 """
 services/llm.py
 ===============
-Servicio LLM principal usando Groq + llama-3.3-70b-versatile.
+Servicio LLM principal usando Groq y un modelo configurable.
 Provee análisis de compatibilidad de hardware con razonamiento técnico.
 
 IL2.1 - Herramienta de razonamiento integrada en el agente.
@@ -13,8 +13,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-MODEL = "llama-3.3-70b-versatile"
+MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
+
+def get_client():
+    """Valida la configuración al usar Groq, sin exigir secretos al importar."""
+    api_key = os.getenv("GROQ_API_KEY", "")
+    if not api_key or api_key in {"dummy", "tu_groq_api_key_aqui"}:
+        raise ValueError("Configura GROQ_API_KEY para usar el análisis o el chat.")
+    return Groq(api_key=api_key)
 
 
 def analizar_con_ia(cpu, gpu, ram, mb, case, contexto: str) -> str:
@@ -72,7 +79,7 @@ Responde ÚNICAMENTE con estos apartados:
 7. (SOLO si hay componentes que no existen en la realidad) Indicar cuáles no existen.
 """
 
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.1,
@@ -107,7 +114,7 @@ def chat_simple(mensaje: str, historial: list = None) -> str:
 
     messages.append({"role": "user", "content": mensaje})
 
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model=MODEL,
         messages=messages,
         temperature=0,
