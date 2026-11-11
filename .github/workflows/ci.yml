@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -68,7 +68,7 @@ jobs:
       VCS_REF: ${{ github.sha }}
       COMPOSE_PROJECT_NAME: gmcomponents-ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validar orquestación
         run: docker compose config --quiet
       - name: Construir imagen identificada por commit
