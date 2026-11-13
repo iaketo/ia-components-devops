@@ -1,5 +1,5 @@
 groq>=0.9.0
-setuptools>=83.0.0
+setuptools>=84.1.0
 torch>=2.14.1
 python-dotenv>=1.0.0
 requests>=2.34.2
@@ -8,4 +8,11 @@ sentence-transformers>=6.0.1
 faiss-cpu>=1.8.0
 numpy>=1.26.0
 
-streamlit>=1.35.0
+streamlit>=1.67.0
+
+prometheus-client>=0.22,<1
+
+# Versiones mínimas corregidas verificadas con pip-audit (EP3).
+certifi>=2026.10.18
+filelock>=4.2.1
+pillow>=13.0.0

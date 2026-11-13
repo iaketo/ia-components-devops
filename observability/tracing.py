@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import logging
 import os
 import time
 import uuid
@@ -93,6 +94,13 @@ class ObservabilityRecorder:
         with open(self.traces_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
         self.write_summary(summarize_traces(load_traces(self.traces_file)))
+        from observability.metrics import record_run
+        record_run(record)
+        # Correlación sin publicar consultas, respuestas, metadata ni secretos.
+        logging.getLogger("gmcomponents.traces").info(json.dumps({
+            "event": "agent_run", "trace_id": record["trace_id"],
+            "ok": record["ok"], "duration_ms": record["duration_ms"],
+        }))
 
     def write_summary(self, summary: dict[str, Any]) -> None:
         with open(self.summary_file, "w", encoding="utf-8") as f:

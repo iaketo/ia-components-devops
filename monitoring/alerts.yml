@@ -1,0 +1,23 @@
+groups:
+  - name: gmcomponents
+    rules:
+      - alert: GatewayUnavailable
+        expr: probe_success{job="gateway-health"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: El gateway no responde al healthcheck
+      - alert: ReplicaMetricsUnavailable
+        expr: up{job="gmcomponents"} == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Una réplica no expone métricas
+      - alert: AgentErrors
+        expr: sum(increase(gm_agent_runs_total{status="error"}[5m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: El agente registró errores en los últimos cinco minutos

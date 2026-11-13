@@ -165,3 +165,10 @@ Al principio me costó entender GitFlow, sobre todo diferenciar main de develop 
 
 [Álvaro Eyzaguirre]
 Durante el desarrollo del proyecto pude aprender y aplicar GitFlow para organizar el trabajo con mi compañero. Lo que más me gustó fue la forma en que se puede revisar y aprobar el código de otra persona antes de integrarlo, ya que permite tener un mayor control sobre los cambios realizados. Esta experiencia me ayudó a entender mejor cómo GitFlow facilita el trabajo colaborativo y la integración del código entre los integrantes del equipo.
+
+
+## Evaluación Parcial 3
+
+Se extendió el CI/CD de EP2 con Prometheus, Grafana, métricas por réplica, sonda de disponibilidad, métricas reales de cobertura/despliegue y pruebas negativas del bloqueo de cumplimiento. La configuración básica de Compose sigue disponible; el stack de monitoreo se activa con `-f docker-compose.yml -f docker-compose.monitoring.yml`. El workflow usa ambos archivos y conserva los gates obligatorios antes del despliegue.
+
+Consultar [procedimiento, matriz ponderada y pendientes de EP3](docs/evaluacion_3_observabilidad.md). El alcance prioriza los indicadores que suman 80%; Kubernetes en nube (IE2, 20%) queda pendiente y no se presenta Compose como cumplimiento de ese requisito.

@@ -1,0 +1,308 @@
+{
+  "uid": "gmcomponents-ep3",
+  "title": "GM Components \u00b7 EP3",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "tags": [
+    "EP3",
+    "DevOps"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Gateway disponible",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "probe_success{job=\"gateway-health\"}",
+          "refId": "A",
+          "legendFormat": "{{instance}} {{status}}"
+        }
+      ],
+      "options": {}
+    },
+    {
+      "id": 2,
+      "title": "R\u00e9plicas con m\u00e9tricas",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(up{job=\"gmcomponents\"})",
+          "refId": "A",
+          "legendFormat": "{{instance}} {{status}}"
+        }
+      ],
+      "options": {}
+    },
+    {
+      "id": 3,
+      "title": "Cobertura del commit",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "gm_ci_test_coverage_percent",
+          "refId": "A",
+          "legendFormat": "{{instance}} {{status}}"
+        }
+      ],
+      "options": {}
+    },
+    {
+      "id": 4,
+      "title": "Duraci\u00f3n despliegue (sin build)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "gm_ci_deployment_duration_seconds",
+          "refId": "A",
+          "legendFormat": "{{instance}} {{status}}"
+        }
+      ],
+      "options": {}
+    },
+    {
+      "id": 5,
+      "title": "CPU por r\u00e9plica (n\u00facleos)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total{job=\"gmcomponents\"}[1m])",
+          "refId": "A",
+          "legendFormat": "{{instance}} {{status}}"
+        }
+      ],
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "Memoria residente por r\u00e9plica",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes{job=\"gmcomponents\"}",
+          "refId": "A",
+          "legendFormat": "{{instance}} {{status}}"
+        }
+      ],
+      "options": {}
+    },
+    {
+      "id": 7,
+      "title": "Errores del agente en 5 minutos",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(gm_agent_runs_total{status=\"error\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "{{instance}} {{status}}"
+        }
+      ],
+      "options": {}
+    },
+    {
+      "id": 8,
+      "title": "Latencia P95 del agente",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(gm_agent_duration_seconds_bucket[5m])))",
+          "refId": "A",
+          "legendFormat": "{{instance}} {{status}}"
+        }
+      ],
+      "options": {}
+    },
+    {
+      "id": 9,
+      "title": "Ejecuciones por estado",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (status) (gm_agent_runs_total)",
+          "refId": "A",
+          "legendFormat": "{{instance}} {{status}}"
+        }
+      ],
+      "options": {}
+    },
+    {
+      "id": 10,
+      "title": "\u00daltima publicaci\u00f3n de CI",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "push_time_seconds{job=\"gmcomponents-ci\"}",
+          "refId": "A",
+          "legendFormat": "{{instance}} {{status}}"
+        }
+      ],
+      "options": {}
+    }
+  ],
+  "description": "Sin datos significa que a\u00fan no se recibi\u00f3 evidencia. Logs y trace_id en Streamlit y docker compose logs."
+}

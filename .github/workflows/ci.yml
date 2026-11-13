@@ -48,6 +48,8 @@ jobs:
         run: python scripts/audit_dependencies.py
       - name: SonarQube y Quality Gate obligatorio
         run: python scripts/sonarqube_gate.py
+      - name: Verificar política de cumplimiento con evidencia completa
+        run: python scripts/compliance_gate.py
       - name: Conservar resultados de calidad y seguridad
         if: always()
         uses: actions/upload-artifact@v4
@@ -64,22 +66,43 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
+      COMPOSE_FILE: docker-compose.yml:docker-compose.monitoring.yml
       APP_IMAGE: gmcomponents-ev2:${{ github.sha }}
       VCS_REF: ${{ github.sha }}
       COMPOSE_PROJECT_NAME: gmcomponents-ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Recuperar cobertura del mismo commit
+        uses: actions/download-artifact@v4
+        with:
+          name: quality-${{ github.sha }}
+          path: quality-evidence
+      - name: Validar configuración de Prometheus y alertas
+        run: |
+          docker compose run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
       - name: Validar orquestación
         run: docker compose config --quiet
       - name: Construir imagen identificada por commit
         run: docker compose build gmcomponents
       - name: Desplegar dos réplicas detrás del gateway
-        run: docker compose up -d --no-build --scale gmcomponents=2 --wait --wait-timeout 180
+        run: |
+          echo "DEPLOY_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+          docker compose up -d --no-build --scale gmcomponents=2 --wait --wait-timeout 180
       - name: Comprobar gateway y cada réplica
         run: |
           curl --fail --silent http://127.0.0.1:8501/_stcore/health
           docker compose exec -T --index 1 gmcomponents python scripts/smoke_test.py
           docker compose exec -T --index 2 gmcomponents python scripts/smoke_test.py
+      - name: Publicar métricas de cobertura y despliegue y comprobar monitoreo
+        run: |
+          python scripts/ci_metrics.py --coverage quality-evidence/coverage.xml --deployment-seconds "$(( $(date +%s) - DEPLOY_STARTED_AT ))"
+          curl --fail --silent --show-error --retry 5 --retry-connrefused --data-binary @reports/ci-metrics.prom http://127.0.0.1:9091/metrics/job/gmcomponents-ci
+          python scripts/check_monitoring.py
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:3000/api/health > reports/grafana-health.json
+          curl --fail --silent http://127.0.0.1:3000/api/dashboards/uid/gmcomponents-ep3 > reports/grafana-dashboard.json
       - name: Validar servicios externos reales cuando se solicite
         if: github.event_name == 'workflow_dispatch' && inputs.live_validation
         env:
