@@ -36,9 +36,9 @@ def test_exporter_observes_real_success_and_error(tmp_path, caplog):
             assert record["trace_id"] in caplog.text
         after = samples()
         for status in ("success", "error"):
-            key = "gm_agent_runs_total" + str([("status", status)])
+            key = "gm_agent_runs_total" + str([("source", "app"), ("status", status)])
             assert after[key] - before.get(key, 0) == 1
-        assert after["gm_agent_duration_seconds_count[]"] - before.get("gm_agent_duration_seconds_count[]", 0) == 2
+        assert after["gm_agent_duration_seconds_count[('source', 'app')]"] - before.get("gm_agent_duration_seconds_count[('source', 'app')]", 0) == 2
         assert after["process_resident_memory_bytes[]"] > 0
         assert "DO_NOT_LOG" not in caplog.text
     finally:

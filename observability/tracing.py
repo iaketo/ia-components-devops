@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import time
+import threading
 import uuid
 from contextlib import contextmanager
 from datetime import datetime
@@ -14,6 +15,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OBSERVABILITY_DIR = os.path.join(os.getenv("APP_DATA_DIR", PROJECT_ROOT), "observability_data")
 TRACES_FILE = os.path.join(OBSERVABILITY_DIR, "traces.jsonl")
 SUMMARY_FILE = os.path.join(OBSERVABILITY_DIR, "metrics_summary.json")
+WRITE_LOCK = threading.RLock()
 
 
 def _utc_now() -> str:
@@ -91,20 +93,26 @@ class ObservabilityRecorder:
         return TraceRun(self, operation, metadata)
 
     def write_trace(self, record: dict[str, Any]) -> None:
-        with open(self.traces_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-        self.write_summary(summarize_traces(load_traces(self.traces_file)))
+        with WRITE_LOCK:
+            with open(self.traces_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            self.write_summary(summarize_traces(load_traces(self.traces_file)))
         from observability.metrics import record_run
         record_run(record)
         # Correlación sin publicar consultas, respuestas, metadata ni secretos.
         logging.getLogger("gmcomponents.traces").info(json.dumps({
             "event": "agent_run", "trace_id": record["trace_id"],
+            "operation": record["operation"],
             "ok": record["ok"], "duration_ms": record["duration_ms"],
         }))
 
     def write_summary(self, summary: dict[str, Any]) -> None:
-        with open(self.summary_file, "w", encoding="utf-8") as f:
-            json.dump(summary, f, ensure_ascii=False, indent=2)
+        # Reemplazo atómico: un lector nunca ve JSON parcialmente escrito.
+        with WRITE_LOCK:
+            temporary = self.summary_file + ".tmp"
+            with open(temporary, "w", encoding="utf-8") as f:
+                json.dump(summary, f, ensure_ascii=False, indent=2)
+            os.replace(temporary, self.summary_file)
 
 
 def load_traces(path: str = TRACES_FILE) -> list[dict[str, Any]]:

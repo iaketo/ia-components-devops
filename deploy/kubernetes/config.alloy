@@ -1,0 +1,44 @@
+// Acceso solo a pods y logs del namespace gmcomponents, sin socket Docker.
+discovery.kubernetes "app" {
+  role = "pod"
+  namespaces {
+    names = ["gmcomponents"]
+  }
+  selectors {
+    role = "pod"
+    label = "app=gmcomponents"
+  }
+}
+
+discovery.relabel "app" {
+  targets = discovery.kubernetes.app.targets
+  // Un target por contenedor: el pod tiene puertos web y metrics.
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_port_name"]
+    regex = "http"
+    action = "keep"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label = "namespace"
+  }
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label = "pod"
+  }
+  rule {
+    target_label = "app"
+    replacement = "gmcomponents"
+  }
+}
+
+loki.source.kubernetes "app" {
+  targets = discovery.relabel.app.output
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

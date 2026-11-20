@@ -61,10 +61,10 @@ jobs:
           if-no-files-found: warn
 
   docker-deploy:
-    name: Construcción y despliegue simulado
+    name: Docker, Compose y Kubernetes cloud
     needs: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       COMPOSE_FILE: docker-compose.yml:docker-compose.monitoring.yml
       APP_IMAGE: gmcomponents-ev2:${{ github.sha }}
@@ -127,3 +127,47 @@ jobs:
       - name: Limpiar entorno simulado
         if: always()
         run: docker compose down --volumes --remove-orphans
+
+      - name: Crear Kubernetes efímero en el runner cloud
+        uses: helm/kind-action@v1.12.0
+        with:
+          version: v0.30.0
+          kubectl_version: v1.34.0
+          node_image: kindest/node:v1.34.0
+          cluster_name: gmcomponents
+          config: deploy/kubernetes/kind.yaml
+          wait: 120s
+      - name: Desplegar imagen verificada y observabilidad en Kubernetes
+        env:
+          EP3_SELF_TEST: 'true'
+        run: |
+          echo "KUBE_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+          kind load docker-image "$APP_IMAGE" --name gmcomponents
+          bash scripts/deploy_kubernetes.sh
+      - name: Validar funcionalidad en ambos pods
+        run: |
+          for pod in $(kubectl -n gmcomponents get pods -l app=gmcomponents -o jsonpath='{.items[*].metadata.name}'); do
+            kubectl -n gmcomponents exec "$pod" -- python scripts/smoke_test.py
+          done
+      - name: Publicar evidencia CI y verificar métricas, logs, alertas y recuperación
+        run: |
+          python scripts/ci_metrics.py --coverage quality-evidence/coverage.xml --deployment-seconds "$(( $(date +%s) - KUBE_STARTED_AT ))" --output reports/kubernetes/ci-metrics.prom
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --data-binary @reports/kubernetes/ci-metrics.prom http://127.0.0.1:9091/metrics/job/gmcomponents-ci
+          python scripts/check_monitoring.py --output reports/kubernetes/monitoring.json
+          python scripts/check_kubernetes.py
+      - name: Recoger evidencia Kubernetes del commit
+        if: always()
+        run: bash scripts/collect_kubernetes.sh
+      - name: Conservar evidencia Kubernetes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubernetes-${{ github.sha }}
+          path: reports/kubernetes/
+          if-no-files-found: warn
+      - name: Eliminar el clúster efímero
+        if: always()
+        run: |
+          if command -v kind >/dev/null 2>&1; then
+            kind delete cluster --name gmcomponents
+          fi

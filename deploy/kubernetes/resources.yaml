@@ -1,0 +1,882 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gmcomponents
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.34
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gmcomponents
+  namespace: gmcomponents
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gmcomponents
+  template:
+    metadata:
+      labels:
+        app: gmcomponents
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: app
+        image: gmcomponents-app:ep3
+        ports:
+        - containerPort: 8501
+          name: http
+        - name: metrics
+          containerPort: 9100
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: '1'
+            memory: 2Gi
+        readinessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 5
+        startupProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60
+        volumeMounts:
+        - name: data
+          mountPath: /data
+          readOnly: false
+        - name: tmp
+          mountPath: /tmp
+          readOnly: false
+        imagePullPolicy: Never
+        envFrom:
+        - configMapRef:
+            name: gmcomponents-env
+      volumes:
+      - name: data
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gmcomponents
+  namespace: gmcomponents
+spec:
+  selector:
+    app: gmcomponents
+  ports:
+  - name: web
+    port: 8501
+    targetPort: 8501
+  - name: metrics
+    port: 9100
+    targetPort: 9100
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: gmcomponents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: gateway
+        image: nginxinc/nginx-unprivileged:1.28-alpine
+        ports:
+        - containerPort: 8080
+          name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8080
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8080
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 5
+        startupProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8080
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60
+        volumeMounts:
+        - name: gateway-config
+          mountPath: /etc/nginx/conf.d
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+          readOnly: false
+      volumes:
+      - name: gateway-config
+        configMap:
+          name: gateway-config
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: gmcomponents
+spec:
+  selector:
+    app: gateway
+  ports:
+  - name: web
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: gmcomponents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v3.5.0
+        ports:
+        - containerPort: 9090
+          name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 5
+        startupProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60
+        args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.retention.time=7d
+        volumeMounts:
+        - name: prometheus-config
+          mountPath: /etc/prometheus
+          readOnly: true
+        - name: data
+          mountPath: /prometheus
+          readOnly: false
+      volumes:
+      - name: prometheus-config
+        configMap:
+          name: prometheus-config
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: gmcomponents
+spec:
+  selector:
+    app: prometheus
+  ports:
+  - name: http
+    port: 9090
+    targetPort: 9090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox
+  namespace: gmcomponents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blackbox
+  template:
+    metadata:
+      labels:
+        app: blackbox
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: blackbox
+        image: prom/blackbox-exporter:v0.27.0
+        ports:
+        - containerPort: 9115
+          name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 9115
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 9115
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 5
+        startupProbe:
+          httpGet:
+            path: /metrics
+            port: 9115
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60
+        args:
+        - --config.file=/etc/blackbox/config.yml
+        volumeMounts:
+        - name: blackbox-config
+          mountPath: /etc/blackbox
+          readOnly: true
+      volumes:
+      - name: blackbox-config
+        configMap:
+          name: blackbox-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: blackbox
+  namespace: gmcomponents
+spec:
+  selector:
+    app: blackbox
+  ports:
+  - name: http
+    port: 9115
+    targetPort: 9115
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pushgateway
+  namespace: gmcomponents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pushgateway
+  template:
+    metadata:
+      labels:
+        app: pushgateway
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: pushgateway
+        image: prom/pushgateway:v1.11.1
+        ports:
+        - containerPort: 9091
+          name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9091
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9091
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 5
+        startupProbe:
+          httpGet:
+            path: /-/ready
+            port: 9091
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pushgateway
+  namespace: gmcomponents
+spec:
+  selector:
+    app: pushgateway
+  ports:
+  - name: http
+    port: 9091
+    targetPort: 9091
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loki
+  namespace: gmcomponents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: loki
+        image: grafana/loki:3.5.3
+        ports:
+        - containerPort: 3100
+          name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3100
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: 3100
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 5
+        startupProbe:
+          httpGet:
+            path: /ready
+            port: 3100
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60
+        args:
+        - -config.file=/etc/loki/config.yml
+        volumeMounts:
+        - name: loki-config
+          mountPath: /etc/loki
+          readOnly: true
+        - name: data
+          mountPath: /loki
+          readOnly: false
+        - name: tmp
+          mountPath: /tmp
+          readOnly: false
+      volumes:
+      - name: loki-config
+        configMap:
+          name: loki-config
+      - name: data
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: gmcomponents
+spec:
+  selector:
+    app: loki
+  ports:
+  - name: http
+    port: 3100
+    targetPort: 3100
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alloy
+  namespace: gmcomponents
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: alloy-logs
+  namespace: gmcomponents
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: alloy-logs
+  namespace: gmcomponents
+subjects:
+- kind: ServiceAccount
+  name: alloy
+  namespace: gmcomponents
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: alloy-logs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alloy
+  namespace: gmcomponents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alloy
+  template:
+    metadata:
+      labels:
+        app: alloy
+    spec:
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: alloy
+        image: grafana/alloy:v1.11.3
+        ports:
+        - containerPort: 12345
+          name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 12345
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /-/ready
+            port: 12345
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 5
+        startupProbe:
+          httpGet:
+            path: /-/ready
+            port: 12345
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60
+        args:
+        - run
+        - --server.http.listen-addr=0.0.0.0:12345
+        - --storage.path=/var/lib/alloy
+        - /etc/alloy/config.alloy
+        volumeMounts:
+        - name: alloy-config
+          mountPath: /etc/alloy
+          readOnly: true
+        - name: data
+          mountPath: /var/lib/alloy
+          readOnly: false
+        - name: tmp
+          mountPath: /tmp
+          readOnly: false
+      serviceAccountName: alloy
+      volumes:
+      - name: alloy-config
+        configMap:
+          name: alloy-config
+      - name: data
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: gmcomponents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:v0.28.1
+        ports:
+        - containerPort: 9093
+          name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 5
+        startupProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60
+        args:
+        - --config.file=/etc/alertmanager/config.yml
+        - --storage.path=/alertmanager
+        - --cluster.listen-address=
+        volumeMounts:
+        - name: alertmanager-config
+          mountPath: /etc/alertmanager
+          readOnly: true
+        - name: data
+          mountPath: /alertmanager
+          readOnly: false
+      volumes:
+      - name: alertmanager-config
+        configMap:
+          name: alertmanager-config
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: gmcomponents
+spec:
+  selector:
+    app: alertmanager
+  ports:
+  - name: http
+    port: 9093
+    targetPort: 9093
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: gmcomponents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: grafana
+        image: grafana/grafana:12.1.1
+        ports:
+        - containerPort: 3000
+          name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 5
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 60
+        env:
+        - name: GF_AUTH_ANONYMOUS_ENABLED
+          value: 'true'
+        - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+          value: Viewer
+        - name: GF_AUTH_DISABLE_LOGIN_FORM
+          value: 'true'
+        - name: GF_ANALYTICS_REPORTING_ENABLED
+          value: 'false'
+        - name: GF_PATHS_PROVISIONING
+          value: /etc/grafana/provisioning
+        volumeMounts:
+        - name: grafana-datasources
+          mountPath: /etc/grafana/provisioning/datasources
+          readOnly: true
+        - name: grafana-provider
+          mountPath: /etc/grafana/provisioning/dashboards
+          readOnly: true
+        - name: grafana-dashboard
+          mountPath: /var/lib/grafana/dashboards
+          readOnly: true
+        - name: data
+          mountPath: /var/lib/grafana
+          readOnly: false
+        - name: tmp
+          mountPath: /tmp
+          readOnly: false
+      volumes:
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+      - name: grafana-provider
+        configMap:
+          name: grafana-provider
+      - name: grafana-dashboard
+        configMap:
+          name: grafana-dashboard
+      - name: data
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: gmcomponents
+spec:
+  selector:
+    app: grafana
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000

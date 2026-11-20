@@ -2,18 +2,18 @@
 
 ## Alcance y pauta
 
-Base revisada: `main`, commit `8bf96a9` (EP2 fusionada). Se conservan los tests funcionales, cobertura mínima de 80%, auditoría completa de dependencias, SonarQube temporal, imagen por SHA, dos réplicas, gateway y smoke tests. Se extiende ese pipeline; no se reemplaza.
+Base revisada: `main`, commit `5409e88` (EP3 parcial sobre EP2 fusionada). Se conservan los tests funcionales, cobertura mínima de 80%, auditoría completa de dependencias, SonarQube temporal, imagen por SHA, dos réplicas, gateway y smoke tests. Se extiende ese pipeline; no se reemplaza.
 
-El objetivo de alcance es aproximadamente 80% de la pauta, no una garantía de nota. Se concentran los cambios en IE1, IE5 e IE6, de 20% cada uno, y en IE3/IE4, de 10% cada uno. IE2 (20%, Kubernetes en nube) queda pendiente: Docker Compose es un entorno simulado, no evidencia de Kubernetes ni de despliegue en nube. No se inventan capturas, resultados ni recursos cloud.
+El alcance ahora cubre los seis indicadores. El destino autorizado es Kubernetes real con kind en una VM cloud efímera de GitHub Actions. No es EKS/GKE/AKS ni infraestructura permanente. La calificación corresponde al docente; esta descripción distingue despliegue académico verificado de operación productiva continua.
 
-| Indicador | Peso | Implementación/evidencia | Límite |
-|---|---:|---|---|
-| IE1: monitoreo y logs | 20% | Prometheus descubre cada réplica por DNS; métricas del agente y del proceso; blackbox consulta health del gateway; JSONL y logs stdout con `trace_id` | No hay agregador central de logs; las trazas detalladas se consultan por réplica |
-| IE2: orquestación en nube | 20% | Se conserva Compose con dos réplicas y límites de recursos | Pendiente Kubernetes/cloud y validación real en ese entorno |
-| IE3: dashboard CI/CD | 10% | Grafana provisionado: cobertura, duración de despliegue, CPU, memoria, errores, latencia y disponibilidad; CI verifica los targets y guarda respuestas | Métricas de CI corresponden al último despliegue en ese stack; no hay historial entre runners efímeros |
-| IE4: documentación | 10% | Este procedimiento, mapa del pipeline y tabla operativa | El equipo debe validar la documentación y redactar sus propias conclusiones |
-| IE5: cumplimiento | 20% | pip-audit sin omitir dependencias, SonarQube, cobertura >=80%; `scripts/compliance_gate.py` exige reportes completos | No se cambiaron reglas remotas de branch protection; no constituye certificación normativa |
-| IE6: bloqueo | 20% | Sin `continue-on-error`; `docker-deploy` requiere `quality`; pruebas negativas ejecutan la política real como proceso y exigen salida 1 | Casos negativos sintéticos, identificados como tales; no se introducen vulnerabilidades reales |
+| Indicador | Peso | Implementación/evidencia |
+|---|---:|---|
+| IE1: monitoreo y logs | 20% | Prometheus por réplica, sonda HTTP, métricas del proceso y agente; Alloy recoge stdout de ambos pods y Loki centraliza logs correlacionados por `trace_id` |
+| IE2: orquestación cloud | 20% | El runner cloud crea Kubernetes kind, carga la imagen del mismo SHA, aplica manifiestos y ConfigMaps, espera readiness y verifica ambos pods, monitoreo y recuperación |
+| IE3: dashboard CI/CD | 10% | Grafana provisionado con cobertura, despliegue, CPU, memoria, errores, P95, logs y alertas; métricas CI provienen de cobertura y tiempos reales |
+| IE4: documentación | 10% | Este procedimiento y el mapa operativo del pipeline, métricas y evidencias; las reflexiones personales corresponden al equipo |
+| IE5: cumplimiento | 20% | Auditoría completa pip-audit, SonarQube, cobertura >=80%, gate que rechaza evidencia ausente/inválida y comprobaciones de contenedores Kubernetes restringidos |
+| IE6: bloqueo | 20% | `needs: quality` sin omitir errores; pruebas negativas y workflow dedicado que queda rojo intencionalmente y omite su job de despliegue |
 
 ## Flujo CI/CD y trazabilidad
 
@@ -24,7 +24,12 @@ El objetivo de alcance es aproximadamente 80% de la pauta, no una garantía de n
 5. `docker-deploy`, con `needs: quality`, descarga la cobertura de ese mismo workflow/commit. Valida Prometheus con `promtool`, construye la imagen por SHA y despliega dos réplicas, gateway y el complemento de monitoreo.
 6. El reloj comienza inmediatamente antes de `compose up`. Después de health y smoke de ambas réplicas, `ci_metrics.py` convierte la cobertura XML y los segundos transcurridos a formato Prometheus. La duración incluye el arranque del stack y los smoke tests; excluye construcción de imagen y validación externa opcional.
 7. `curl --fail` publica estas métricas en Pushgateway. `check_monitoring.py` exige dos targets de aplicación UP, sonda HTTP exitosa, cobertura >=80 y duración válida consultando Prometheus; Grafana debe responder y tener el dashboard provisionado. Cualquier fallo bloquea el job.
-8. `deployment-<SHA>` conserva métricas, consultas reales de monitoreo, dashboard JSON, salud de Grafana, contenedores, logs y revisión de imagen. El stack y sus volúmenes se eliminan al finalizar el runner.
+8. `deployment-<SHA>` conserva la evidencia Compose. Ese stack se elimina antes de crear Kubernetes para liberar puertos y memoria.
+9. kind crea un clúster Kubernetes 1.34.0 en el mismo runner cloud. `kind load docker-image` carga la imagen ya construida y verificada. No se reconstruye otro código para Kubernetes.
+10. `deploy_kubernetes.sh` aplica recursos y configuración, espera todos los despliegues y abre túneles locales de diagnóstico. La imagen se identifica por SHA; el Deployment registra esa revisión en una anotación. La aplicación no necesita acceso a la API de Kubernetes. Solo Alloy usa un ServiceAccount con permisos de lectura de pods/logs en el namespace.
+11. Los smoke tests se repiten dentro de ambos pods. La cobertura y el tiempo de despliegue Kubernetes se publican en su Pushgateway; `check_monitoring.py` verifica la recepción real por Prometheus.
+12. `check_kubernetes.py` exige contadores/histogramas, recursos y logs de ambos pods, dashboard y fuentes Prometheus/Loki. Escala el gateway a cero, comprueba sonda fallida, alerta crítica y recepción en Alertmanager; luego restaura el gateway. Elimina un pod de aplicación y exige su reemplazo por uno con otro UID, dos pods listos y dos exporters UP.
+13. `kubernetes-<SHA>` conserva recursos, versión del clúster, eventos, logs y `runtime-verification.json`, incluidos tiempos observados y entorno de ejecución. El clúster se elimina incluso si una comprobación falla.
 
 No se suprimen vulnerabilidades ni se baja la cobertura. SonarQube sigue bloqueando vulnerabilidades y violaciones críticas/blocker. Los controles protegen este pipeline; impedir pushes directos o merges sin checks requiere reglas de GitHub adicionales, pendientes de configuración del equipo.
 
@@ -56,9 +61,9 @@ python scripts/check_monitoring.py
 - [Prometheus](http://127.0.0.1:9090): consultar targets, series y alertas.
 - [Pushgateway](http://127.0.0.1:9091): recibe evidencia de CI. No se publica fuera de loopback.
 
-No cambiar esos bindings a interfaces públicas sin autenticación. El exporter interno 9100 no publica puerto en el host. Su arranque ocurre en `scripts/run_app.py`, antes de recibir sesiones Streamlit; cada proceso mantiene sus propias series. Las etiquetas solo contienen estados de cardinalidad acotada, no IDs de trazas, consultas, respuestas o secretos.
+No cambiar esos bindings a interfaces públicas sin autenticación. El exporter interno 9100 no publica puerto en el host. Su arranque ocurre en `scripts/run_app.py`, antes de recibir sesiones Streamlit; cada proceso mantiene sus propias series. Las etiquetas solo contienen estados y `source=app|self_test`, de cardinalidad acotada; no IDs de trazas, consultas, respuestas o secretos.
 
-Para registrar ejecuciones de la aplicación, analizar un carrito en Streamlit. Las métricas de errores/latencia necesitan ejecuciones y varias muestras; ausencia de datos no equivale a cero fallas. Los smoke tests corren en procesos aparte y no incrementan los contadores del proceso web.
+Para registrar ejecuciones de la aplicación, analizar un carrito en Streamlit. Las métricas de errores/latencia necesitan ejecuciones y varias muestras; ausencia de datos no equivale a cero fallas. Los smoke tests corren en procesos aparte y no incrementan los contadores del proceso web. Para validar la cadena de observabilidad del propio proceso web, CI activa `OBSERVABILITY_SELF_TEST=true` únicamente en Kubernetes. Cada pod registra una ejecución sintética exitosa y otra fallida. Sus series llevan `source=self_test` y los logs `operation=observability_self_test`; los paneles operativos y la alerta de errores filtran `source=app`. La opción está desactivada por defecto y no añade endpoints de inyección de errores.
 
 ```bash
 # Logs operativos correlacionados (event, trace_id, ok, duration_ms).
@@ -85,7 +90,7 @@ Cada réplica conserva su propio volumen anónimo `/data`; el dashboard Streamli
 | Cobertura | `gm_ci_test_coverage_percent` desde XML | El gate exige >=80%; revisar reporte por módulo, no solo el total |
 | Duración despliegue | `gm_ci_deployment_duration_seconds` | Comparar arranque/smoke con evidencia anterior; el tiempo de build se observa en Actions |
 
-Hay reglas de alerta para gateway caído 30 s, exporter caído 30 s y errores del agente en cinco minutos. Se evalúan y visualizan en Prometheus; no hay Alertmanager ni envío de notificaciones externas.
+Hay reglas para gateway caído 30 s, menos de dos exporters durante 30 s (también si desaparecen todos los targets) y errores del agente en cinco minutos. En Kubernetes Prometheus las entrega a Alertmanager y el ensayo de caída verifica esa recepción. El receptor es local, visible por API/UI; no envía correos ni mensajes a terceros.
 
 ## Demostrar el bloqueo sin comprometer el proyecto
 
@@ -95,24 +100,41 @@ python -m pytest tests/test_ep3.py -v
 python scripts/compliance_gate.py
 ```
 
-`reports/negative-gate-tests/` muestra la salida 0 del caso sano y la salida 1 de los seis casos negativos. Son pruebas controladas, no evidencia de una vulnerabilidad real detectada. El JUnit documenta que las aserciones se ejecutaron. El workflow usa el mismo script de gate y no ejecuta `docker-deploy` si `quality` falla. Una demostración adicional de un workflow completo intencionalmente rojo en una rama descartable queda pendiente; no se rompe `main` para obtener esa captura.
+`reports/negative-gate-tests/` muestra la salida 0 del caso sano y la salida 1 de los seis casos negativos. Son pruebas controladas, no evidencia de una vulnerabilidad real detectada. El JUnit documenta que las aserciones se ejecutaron. El workflow usa el mismo script de gate y no ejecuta `docker-deploy` si `quality` falla. Además, `.github/workflows/blocking-demo.yml` ejecuta el gate real en un job con evidencia sintética claramente marcada. Ese job debe fallar y su dependiente `deployment` debe quedar `skipped`. Se ejecuta en `verification/ep3-critical-block` o mediante `workflow_dispatch`; no introduce vulnerabilidades en la aplicación. Que esta demostración quede roja es el resultado esperado, separado del CI normal verde de `main`.
 
-## Pendientes de entrega y límites
+```bash
+# Ejecución manual de la demostración en la rama de verificación:
+gh workflow run blocking-demo.yml --ref verification/ep3-critical-block -f scenario=vulnerability
+# También admite coverage y sonar.
+```
 
-- IE2: elegir proveedor, credenciales, cluster y registro; desplegar en Kubernetes cloud y verificar observabilidad allí. No hay infraestructura cloud creada.
-- Agregación de logs, retención de trazas entre réplicas/runners y persistencia del historial CI entre ejecuciones.
-- Alertmanager, notificaciones y validación de carga. Los límites configurados no son prueba de capacidad.
-- Reglas remotas de branch protection y revisión del alcance normativo aplicable.
-- El equipo debe adjuntar evidencia del nuevo workflow en GitHub, revisar los cambios y escribir sus reflexiones individuales y justificaciones técnicas propias.
+## Reproducir Kubernetes
 
-## Validación de esta implementación
+Los binarios kind 0.30.0, kubectl 1.34.0 y Docker deben estar disponibles. El workflow instala las versiones declaradas. Desde la raíz, con una imagen ya construida del commit:
 
-- Python 3.11: 33 pruebas aprobadas y cobertura agregada 94,49%, usando el mismo comando y umbral que CI.
-- Prueba HTTP del exporter: se generan ejecuciones exitosa/fallida, se consultan contadores e histograma y se verifica que stdout no publique metadata ni mensajes de error privados.
-- Política: caso sano aprobado y seis escenarios negativos rechazados con código 1.
-- `docker compose config --quiet` y `promtool check config`: correctos, incluidas las tres reglas de alerta.
-- Auditoría local completa: 96 dependencias, sin vulnerabilidades conocidas después de actualizar cuatro paquetes antiguos y Streamlit a una versión compatible con Pillow 13. Se fijan esos mínimos corregidos en requirements; no se omiten controles para lograrlo.
-- El entorno local tiene disco limitado y Docker con almacenamiento VFS; la construcción completa y el arranque conjunto no pudieron completarse allí por falta de espacio. La validación definitiva del Dockerfile, SonarQube y el stack corresponde al workflow del commit publicado, cuyos resultados y artefactos se consultan en GitHub Actions. Un pipeline anterior verde no valida estos cambios.
+```bash
+kind create cluster --name gmcomponents --image kindest/node:v1.34.0 --config deploy/kubernetes/kind.yaml --wait 120s
+kind load docker-image "$APP_IMAGE" --name gmcomponents
+# false por defecto para uso normal. CI usa true para probar telemetría explícita.
+EP3_SELF_TEST=true bash scripts/deploy_kubernetes.sh
+# Ejecutar smoke en ambos pods y generar/publicar métricas CI como hace el workflow.
+python scripts/check_monitoring.py --output reports/kubernetes/monitoring.json
+python scripts/check_kubernetes.py
+bash scripts/collect_kubernetes.sh
+kind delete cluster --name gmcomponents
+```
+
+`check_kubernetes.py` provoca una caída controlada y elimina un pod: utilizarlo exclusivamente en el entorno de evaluación. El dashboard Kubernetes tiene UID `gmcomponents-kubernetes`, disponible mediante el túnel en `http://127.0.0.1:3000/d/gmcomponents-kubernetes`. Los servicios son ClusterIP/headless; no se crea LoadBalancer ni exposición pública. Los túneles son locales al runner y desaparecen al finalizarlo.
+
+Los Deployments usan readiness/liveness/startup probes, límites de CPU/memoria, usuario no root, filesystem de solo lectura, `seccomp: RuntimeDefault`, capacidades eliminadas y `allowPrivilegeEscalation=false`. El namespace impone Pod Security Restricted. La memoria y los datos temporales usan `emptyDir`: reiniciar un pod no conserva su estado. Prometheus/Loki tienen retención configurada de siete días mientras dure el entorno; GitHub conserva los artefactos después de eliminar el clúster.
+
+## Límites y validación
+
+- El clúster cloud es efímero y pertenece al runner de GitHub Actions, destino autorizado para esta entrega. No se crea infraestructura permanente ni se requieren cuentas de AWS/Azure/GCP.
+- Los archivos de trazas/memoria de cada pod y el historial interno de Prometheus/Loki no sobreviven al clúster; los artefactos conservan evidencia de auditoría. Producción continua requeriría volúmenes persistentes, respaldos y retención externa.
+- La validación funcional usa servicios externos simulados de manera explícita; FAISS, memoria, aplicación, contenedores, Kubernetes, métricas y logs son reales. La opción `live_validation` previa se conserva para exigir catálogo/embeddings/Groq reales cuando se proporcione el secreto correspondiente en Actions.
+- No se configuraron reglas remotas de branch protection ni se declara certificación normativa. El cumplimiento de esta evaluación se implementa mediante scripts y gates automatizados; las conclusiones/reflexiones individuales deben escribirlas los integrantes.
+- Validación local: 37 pruebas aprobadas, cobertura 94,59%, análisis de configuración y auditoría de dependencias. El resultado definitivo del despliegue corresponde al workflow del commit publicado. Revisar los artefactos `quality-*`, `deployment-*`, `kubernetes-*` y el workflow negativo independiente; un pipeline anterior verde no valida estos cambios.
 
 ## Declaración de IA
 

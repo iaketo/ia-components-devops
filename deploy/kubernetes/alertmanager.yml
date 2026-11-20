@@ -1,0 +1,9 @@
+route:
+  receiver: local
+  group_by: [alertname]
+  group_wait: 5s
+  group_interval: 5s
+  repeat_interval: 1h
+receivers:
+  - name: local
+# Receptor local observable por API/UI; no envía correos ni mensajes externos.

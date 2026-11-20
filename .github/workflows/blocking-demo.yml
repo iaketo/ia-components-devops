@@ -1,0 +1,53 @@
+name: EP3 - Demostración de bloqueo
+
+on:
+  push:
+    branches: [verification/ep3-critical-block]
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Falla sintética que debe impedir el despliegue
+        type: choice
+        options: [vulnerability, coverage, sonar]
+        default: vulnerability
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Gate que debe rechazar la falla crítica
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Preparar evidencia sintética identificada
+        env:
+          SCENARIO: ${{ inputs.scenario || 'vulnerability' }}
+        run: python scripts/gate_fixture.py --scenario "$SCENARIO"
+      - name: Ejecutar la misma política obligatoria del CI real
+        run: >-
+          python scripts/compliance_gate.py
+          --coverage reports/blocking-demo/coverage.xml
+          --audit reports/blocking-demo/dependency-audit.json
+          --sonar reports/blocking-demo/sonarqube.json
+          --output reports/blocking-demo/compliance.json
+      - name: Conservar evidencia incluso cuando se bloquea
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blocking-demo-${{ github.sha }}-${{ github.run_id }}
+          path: reports/blocking-demo/
+          if-no-files-found: error
+
+  deployment:
+    name: Despliegue que debe quedar omitido
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo 'ERROR: un gate rechazado no debe permitir este job'
+          exit 1

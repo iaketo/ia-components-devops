@@ -1,16 +1,18 @@
 """Métricas de cada proceso Streamlit; Prometheus conserva las series por réplica."""
 from prometheus_client import Counter, Histogram, start_http_server
 
-RUNS = Counter("gm_agent_runs", "Ejecuciones finalizadas", ["status"])
+RUNS = Counter("gm_agent_runs", "Ejecuciones finalizadas", ["status", "source"])
 DURATION = Histogram(
     "gm_agent_duration_seconds", "Duración de una ejecución",
+    labelnames=["source"],
     buckets=(0.1, 0.5, 1, 2.5, 5, 10, 30, 60, 120),
 )
 
 
 def record_run(record):
-    RUNS.labels(status="success" if record["ok"] else "error").inc()
-    DURATION.observe(record["duration_ms"] / 1000)
+    source = "self_test" if record.get("operation") == "observability_self_test" else "app"
+    RUNS.labels(status="success" if record["ok"] else "error", source=source).inc()
+    DURATION.labels(source=source).observe(record["duration_ms"] / 1000)
 
 
 def start_metrics_server(port=9100, addr="0.0.0.0"):
