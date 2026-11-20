@@ -10,7 +10,7 @@ rule_files:
 scrape_configs:
   - job_name: gmcomponents
     dns_sd_configs:
-      - names: [gmcomponents]
+      - names: [gmcomponents.gmcomponents.svc.cluster.local]
         type: A
         port: 9100
         refresh_interval: 5s
