@@ -21,6 +21,8 @@ def get_client():
     api_key = os.getenv("GROQ_API_KEY", "")
     if not api_key or api_key in {"dummy", "tu_groq_api_key_aqui"}:
         raise ValueError("Configura GROQ_API_KEY para usar el análisis o el chat.")
+    if not MODEL or MODEL.startswith("gsk_"):
+        raise ValueError("GROQ_MODEL debe contener un nombre de modelo, nunca una clave API.")
     return Groq(api_key=api_key)
 
 

@@ -9,6 +9,12 @@ DURATION = Histogram(
 )
 
 
+# Publicar el cero inicial permite que increase() observe también el primer error.
+for status in ("success", "error"):
+    RUNS.labels(status=status, source="app")
+DURATION.labels(source="app")
+
+
 def record_run(record):
     source = "self_test" if record.get("operation") == "observability_self_test" else "app"
     RUNS.labels(status="success" if record["ok"] else "error", source=source).inc()

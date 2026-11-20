@@ -17,7 +17,7 @@ El alcance ahora cubre los seis indicadores. El destino autorizado es Kubernetes
 
 ## Flujo CI/CD y trazabilidad
 
-1. `quality` instala las dependencias CPU y ejecuta tests con cobertura y JUnit.
+1. `quality` instala las dependencias CPU y ejecuta tests con cobertura y JUnit. `normalize_coverage.py` regenera el XML a partir de las mismas mediciones, con rutas relativas inequívocas para SonarQube y el mismo umbral >=80%; no altera líneas ejecutadas ni elimina archivos.
 2. Entre los tests, `tests/test_ep3.py` ejecuta el gate con evidencia sintética aprobada y seis variantes rechazadas: cobertura 79%, vulnerabilidad, SonarQube ERROR, paquete omitido, reporte ausente y JSON corrupto. Si el gate acepta un caso negativo, falla pytest y se bloquea el despliegue.
 3. La auditoría real de dependencias y SonarQube mantienen sus bloqueos originales. Después, `compliance_gate.py` verifica sus reportes reales junto con `coverage.xml`. Error de formato, ausencia de evidencia o incumplimiento devuelve 1. El reporte queda en `reports/compliance.json`.
 4. Se conserva `quality-<SHA>` incluso ante fallas. Incluye JUnit, cobertura, auditoría, SonarQube y `negative-gate-tests/*.json`. Los reportes de prueba negativa se separan de los de análisis real.
@@ -90,7 +90,7 @@ Cada réplica conserva su propio volumen anónimo `/data`; el dashboard Streamli
 | Cobertura | `gm_ci_test_coverage_percent` desde XML | El gate exige >=80%; revisar reporte por módulo, no solo el total |
 | Duración despliegue | `gm_ci_deployment_duration_seconds` | Comparar arranque/smoke con evidencia anterior; el tiempo de build se observa en Actions |
 
-Hay reglas para gateway caído 30 s, menos de dos exporters durante 30 s (también si desaparecen todos los targets) y errores del agente en cinco minutos. En Kubernetes Prometheus las entrega a Alertmanager y el ensayo de caída verifica esa recepción. El receptor es local, visible por API/UI; no envía correos ni mensajes a terceros.
+Las cinco pruebas de reglas (`monitoring/alerts.test.yml`) verifican espera de 30 s, desaparición de todos los targets, pérdida de una réplica, primer error real y exclusión de errores sintéticos. Los contadores publican cero desde el arranque para permitir detectar el primer incremento. Hay reglas para gateway caído 30 s, menos de dos exporters durante 30 s (también si desaparecen todos los targets) y errores del agente en cinco minutos. En Kubernetes Prometheus las entrega a Alertmanager y el ensayo de caída verifica esa recepción. El receptor es local, visible por API/UI; no envía correos ni mensajes a terceros.
 
 ## Demostrar el bloqueo sin comprometer el proyecto
 
@@ -132,9 +132,10 @@ Los Deployments usan readiness/liveness/startup probes, límites de CPU/memoria,
 
 - El clúster cloud es efímero y pertenece al runner de GitHub Actions, destino autorizado para esta entrega. No se crea infraestructura permanente ni se requieren cuentas de AWS/Azure/GCP.
 - Los archivos de trazas/memoria de cada pod y el historial interno de Prometheus/Loki no sobreviven al clúster; los artefactos conservan evidencia de auditoría. Producción continua requeriría volúmenes persistentes, respaldos y retención externa.
-- La validación funcional usa servicios externos simulados de manera explícita; FAISS, memoria, aplicación, contenedores, Kubernetes, métricas y logs son reales. La opción `live_validation` previa se conserva para exigir catálogo/embeddings/Groq reales cuando se proporcione el secreto correspondiente en Actions.
+- La validación funcional de CI usa servicios externos simulados de manera explícita; FAISS, memoria, aplicación, contenedores, Kubernetes, métricas y logs son reales. La opción `live_validation` previa se conserva para exigir catálogo/embeddings/Groq reales cuando se proporcione el secreto correspondiente en Actions.
+- También pasó el smoke local con catálogo, embeddings y Groq reales, usando `GROQ_MODEL=openai/gpt-oss-120b`. Se verificaron FAISS, análisis, caché, chat y cinco páginas. `GROQ_MODEL` es un identificador de modelo; `GROQ_API_KEY` es la credencial. El código rechaza una clave colocada en la variable de modelo sin mostrar su contenido.
 - No se configuraron reglas remotas de branch protection ni se declara certificación normativa. El cumplimiento de esta evaluación se implementa mediante scripts y gates automatizados; las conclusiones/reflexiones individuales deben escribirlas los integrantes.
-- Validación local: 37 pruebas aprobadas, cobertura 94,59%, análisis de configuración y auditoría de dependencias. El resultado definitivo del despliegue corresponde al workflow del commit publicado. Revisar los artefactos `quality-*`, `deployment-*`, `kubernetes-*` y el workflow negativo independiente; un pipeline anterior verde no valida estos cambios.
+- Validación local: 38 pruebas aprobadas, cobertura 94,67%, análisis de configuración y auditoría de dependencias. El resultado definitivo del despliegue corresponde al workflow del commit publicado. Revisar los artefactos `quality-*`, `deployment-*`, `kubernetes-*` y el workflow negativo independiente; un pipeline anterior verde no valida estos cambios.
 
 ## Declaración de IA
 

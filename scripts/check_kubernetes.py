@@ -13,6 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.check_monitoring import query
 
 NAMESPACE = "gmcomponents"
+PROMETHEUS_URL = "http://127.0.0.1:9090"
+GATEWAY_DEPLOYMENT = "deployment/gateway"
 REPORT = Path("reports/kubernetes/runtime-verification.json")
 
 
@@ -64,7 +66,7 @@ def log_evidence():
 
 
 def check_telemetry():
-    prometheus = "http://127.0.0.1:9090"
+    prometheus = PROMETHEUS_URL
     expressions = {
         "successes": 'sum(gm_agent_runs_total{status="success",source="self_test"})',
         "errors": 'sum(gm_agent_runs_total{status="error",source="self_test"})',
@@ -93,9 +95,9 @@ def outage_test():
     started = time.monotonic()
     result = {}
     try:
-        kubectl("scale", "deployment/gateway", "--replicas=0")
-        wait_for("sonda caída", lambda: query("http://127.0.0.1:9090", 'probe_success{job="gateway-health"}') == [0])
-        wait_for("alerta crítica", lambda: query("http://127.0.0.1:9090", 'ALERTS{alertname="GatewayUnavailable",alertstate="firing"}') == [1])
+        kubectl("scale", GATEWAY_DEPLOYMENT, "--replicas=0")
+        wait_for("sonda caída", lambda: query(PROMETHEUS_URL, 'probe_success{job="gateway-health"}') == [0])
+        wait_for("alerta crítica", lambda: query(PROMETHEUS_URL, 'ALERTS{alertname="GatewayUnavailable",alertstate="firing"}') == [1])
         result["alertmanager"] = wait_for("recepción en Alertmanager", lambda: [
             {"labels": alert["labels"], "status": alert["status"]}
             for alert in get_json("http://127.0.0.1:9093/api/v2/alerts")
@@ -103,9 +105,9 @@ def outage_test():
         ])
         result["detected_seconds"] = round(time.monotonic() - started, 2)
     finally:
-        kubectl("scale", "deployment/gateway", "--replicas=1")
-        kubectl("rollout", "status", "deployment/gateway", "--timeout=180s")
-        wait_for("sonda recuperada", lambda: query("http://127.0.0.1:9090", 'probe_success{job="gateway-health"}') == [1])
+        kubectl("scale", GATEWAY_DEPLOYMENT, "--replicas=1")
+        kubectl("rollout", "status", GATEWAY_DEPLOYMENT, "--timeout=180s")
+        wait_for("sonda recuperada", lambda: query(PROMETHEUS_URL, 'probe_success{job="gateway-health"}') == [1])
     result["recovered"] = True
     return result
 
@@ -123,7 +125,7 @@ def healing_test():
         return pods if len(pods) == 2 and all(p["metadata"]["uid"] != removed["uid"] for p in pods) else None
 
     after = wait_for("reposición automática del pod", recovered, timeout=180)
-    wait_for("scrape de las dos réplicas recuperadas", lambda: query("http://127.0.0.1:9090", 'up{job="gmcomponents"}') == [1, 1])
+    wait_for("scrape de las dos réplicas recuperadas", lambda: query(PROMETHEUS_URL, 'up{job="gmcomponents"}') == [1, 1])
     return {"removed_pod": removed["name"], "ready_pods": [p["metadata"]["name"] for p in after],
             "recovered_seconds": round(time.monotonic() - started, 2)}
 

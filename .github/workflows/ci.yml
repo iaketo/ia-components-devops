@@ -44,6 +44,8 @@ jobs:
           python -m pytest tests/ -v --junitxml=reports/tests.xml
           --cov=agent --cov=services --cov=memory --cov=observability --cov=utils
           --cov-report=xml:coverage.xml --cov-report=term --cov-fail-under=80
+      - name: Normalizar rutas del reporte para SonarQube
+        run: python scripts/normalize_coverage.py
       - name: Bloquear vulnerabilidades de dependencias
         run: python scripts/audit_dependencies.py
       - name: SonarQube y Quality Gate obligatorio
@@ -83,6 +85,7 @@ jobs:
       - name: Validar configuración de Prometheus y alertas
         run: |
           docker compose run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
+          docker compose run --rm --no-deps -v "$PWD/monitoring/alerts.test.yml:/etc/prometheus/alerts.test.yml:ro" --entrypoint promtool prometheus test rules /etc/prometheus/alerts.test.yml
       - name: Validar orquestación
         run: docker compose config --quiet
       - name: Construir imagen identificada por commit

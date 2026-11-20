@@ -45,3 +45,16 @@ def test_search_http_error_is_handled(monkeypatch):
     assert "Error en búsqueda web" in result
     assert "private-token" not in result
     response.json.assert_not_called()
+
+
+def test_key_in_model_is_rejected_without_echo_or_network(monkeypatch):
+    from services import llm
+    synthetic = "gsk_synthetic_fixture_not_a_real_key"
+    monkeypatch.setenv("GROQ_API_KEY", "synthetic-api-key")
+    monkeypatch.setattr(llm, "MODEL", synthetic)
+    client = Mock()
+    monkeypatch.setattr(llm, "Groq", client)
+    with pytest.raises(ValueError, match="GROQ_MODEL") as error:
+        llm.get_client()
+    assert synthetic not in str(error.value)
+    client.assert_not_called()

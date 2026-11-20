@@ -1,0 +1,69 @@
+rule_files:
+  - /etc/prometheus/alerts.yml
+evaluation_interval: 5s
+tests:
+  - name: Gateway requiere treinta segundos de caída
+    interval: 5s
+    input_series:
+      - series: 'probe_success{job="gateway-health",instance="gateway"}'
+        values: '0+0x20'
+    alert_rule_test:
+      - eval_time: 25s
+        alertname: GatewayUnavailable
+        exp_alerts: []
+      - eval_time: 35s
+        alertname: GatewayUnavailable
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: gateway-health
+              instance: gateway
+            exp_annotations:
+              summary: El gateway no responde al healthcheck
+  - name: Detecta desaparición de todos los targets
+    interval: 5s
+    input_series: []
+    alert_rule_test:
+      - eval_time: 35s
+        alertname: ReplicaMetricsUnavailable
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: gmcomponents
+            exp_annotations:
+              summary: Una réplica no expone métricas
+  - name: Detecta una sola réplica disponible
+    interval: 5s
+    input_series:
+      - series: 'up{job="gmcomponents",instance="pod-1"}'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 35s
+        alertname: ReplicaMetricsUnavailable
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Una réplica no expone métricas
+  - name: Primer error de aplicación con contador inicial cero
+    interval: 5s
+    input_series:
+      - series: 'gm_agent_runs_total{source="app",status="error"}'
+        values: '0 0 0 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 20s
+        alertname: AgentErrors
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: El agente registró errores en los últimos cinco minutos
+  - name: Los errores sintéticos no activan alertas de usuarios
+    interval: 5s
+    input_series:
+      - series: 'gm_agent_runs_total{source="self_test",status="error"}'
+        values: '0 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 20s
+        alertname: AgentErrors
+        exp_alerts: []
