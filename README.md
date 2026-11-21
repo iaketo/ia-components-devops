@@ -228,7 +228,7 @@ Las etapas adicionales de seguridad, Docker, despliegue y evidencias se describe
 
 Se utilizó Claude (Anthropic) como apoyo para resolver errores de configuración del pipeline de CI/CD, corregir dependencias en `requirements.txt`, y documentar las convenciones del proyecto. Las decisiones de diseño y las conclusiones individuales fueron elaboradas por los propios integrantes.
 
-En esta actualización se utilizó Codex (OpenAI) para revisar la pauta, implementar configuración CI/CD, pruebas, correcciones y documentación operativa, y ejecutar validaciones locales. El equipo debe revisar y validar estos cambios antes de entregar. Las reflexiones individuales existentes se conservaron. Referencia para declarar el uso de IA: https://bibliotecas.duoc.cl/ia.
+En esta actualización se utilizó Codex (OpenAI) para revisar la pauta, implementar configuración CI/CD, realizar pruebas, correcciones y documentación operativa, y ejecutar validaciones locales.
 
 
 ##Reflexiones##
