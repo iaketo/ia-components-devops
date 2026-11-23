@@ -21,6 +21,8 @@ AUDIT_REPORT = 'dependency-audit.json'
 SONAR_REPORT = 'sonarqube.json'
 CI_METRICS_REPORT = 'ci-metrics.prom'
 
+COVERAGE_LABEL = "Cobertura de pruebas"
+
 PACKAGES = {
     QUALITY: ("01-Pruebas-y-seguridad", "Pruebas, cobertura y seguridad"),
     COMPOSE: ("02-Graficos-y-metricas-locales", "Gráficos y métricas locales - Docker Compose"),
@@ -29,7 +31,7 @@ PACKAGES = {
 }
 FILES = {
     "tests.xml": "Resultado de las pruebas automatizadas",
-    COVERAGE_REPORT: "Cobertura de pruebas",
+    COVERAGE_REPORT: COVERAGE_LABEL,
     AUDIT_REPORT: "Auditoría de dependencias Python",
     "audit-requirements.txt": "Versiones de dependencias auditadas",
     SONAR_REPORT: "Resultado del Quality Gate de SonarQube",
@@ -87,7 +89,7 @@ def metric_rows(output):
     rows = []
     monitor = read_json(output / MONITORING_REPORT)
     for key, label, unit in (
-        ("coverage_percent", "Cobertura de pruebas", "%"),
+        ("coverage_percent", COVERAGE_LABEL, "%"),
         ("deployment_seconds", "Duración medida del despliegue", " s"),
     ):
         if monitor:
@@ -109,9 +111,9 @@ def metric_rows(output):
     if coverage.exists() and not monitor:
         try:
             rate = float(ET.parse(coverage).getroot().attrib["line-rate"]) * 100
-            rows.append(("Cobertura de pruebas", display_number(rate, "%")))
+            rows.append((COVERAGE_LABEL, display_number(rate, "%")))
         except (OSError, ValueError, KeyError, ET.ParseError):
-            rows.append(("Cobertura de pruebas", UNAVAILABLE))
+            rows.append((COVERAGE_LABEL, UNAVAILABLE))
     return rows
 
 
