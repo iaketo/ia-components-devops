@@ -1,4 +1,5 @@
-name: CI-CD
+name: EV3 - Graficos, metricas y pruebas
+run-name: EV3 - Revision y paneles - ${{ github.ref_name }}
 
 on:
   push:
@@ -21,7 +22,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Pruebas y seguridad obligatorias
+    name: 01 - Pruebas y seguridad
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -52,18 +53,19 @@ jobs:
         run: python scripts/sonarqube_gate.py
       - name: Verificar política de cumplimiento con evidencia completa
         run: python scripts/compliance_gate.py
+      - name: Preparar resumen de pruebas y seguridad
+        if: always()
+        run: python scripts/package_reports.py --kind quality --source reports --output reports/paquete-calidad --coverage coverage.xml
       - name: Conservar resultados de calidad y seguridad
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: quality-${{ github.sha }}
-          path: |
-            reports/
-            coverage.xml
+          name: 01-Pruebas-y-seguridad
+          path: reports/paquete-calidad/
           if-no-files-found: warn
 
   docker-deploy:
-    name: Docker, Compose y Kubernetes cloud
+    name: 02 - Paneles y monitoreo (Compose y Kubernetes)
     needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -80,7 +82,7 @@ jobs:
       - name: Recuperar cobertura del mismo commit
         uses: actions/download-artifact@v4
         with:
-          name: quality-${{ github.sha }}
+          name: 01-Pruebas-y-seguridad
           path: quality-evidence
       - name: Validar configuración de Prometheus y alertas
         run: |
@@ -121,12 +123,15 @@ jobs:
           docker compose ps --all --format json > reports/containers.json
           docker compose logs --no-color > reports/deployment.log
           docker image inspect "$APP_IMAGE" --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}' > reports/image.txt
+      - name: Preparar resumen de graficos y metricas locales
+        if: always()
+        run: python scripts/package_reports.py --kind compose --source reports --output reports/paquete-local
       - name: Publicar evidencia vinculada al commit
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: deployment-${{ github.sha }}
-          path: reports/
+          name: 02-Graficos-y-metricas-locales
+          path: reports/paquete-local/
       - name: Limpiar entorno simulado
         if: always()
         run: docker compose down --volumes --remove-orphans
@@ -161,12 +166,15 @@ jobs:
       - name: Recoger evidencia Kubernetes del commit
         if: always()
         run: bash scripts/collect_kubernetes.sh
+      - name: Preparar resumen de Kubernetes, logs y alertas
+        if: always()
+        run: python scripts/package_reports.py --kind kubernetes --source reports/kubernetes --output reports/paquete-kubernetes
       - name: Conservar evidencia Kubernetes
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: kubernetes-${{ github.sha }}
-          path: reports/kubernetes/
+          name: 03-Kubernetes-graficos-logs-y-alertas
+          path: reports/paquete-kubernetes/
           if-no-files-found: warn
       - name: Eliminar el clúster efímero
         if: always()

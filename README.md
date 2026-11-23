@@ -2,6 +2,21 @@
 
 La aplicación Streamlit analiza compatibilidad de hardware usando el catálogo de GM Components, FAISS, embeddings y Groq. El pipeline prueba la aplicación, audita dependencias, analiza el código con SonarQube y verifica dos réplicas en Docker Compose. Después despliega la misma imagen en Kubernetes real con kind dentro de un runner cloud efímero de GitHub Actions, con métricas, logs centralizados, dashboards y pruebas controladas de recuperación.
 
+## Acceso rápido: servicios y paneles
+
+**[ABRIR ÍNDICE DE GRÁFICOS, MÉTRICAS, LOGS Y KUBERNETES](monitoring/README.md)**
+
+| Quiero ver… | Acceso |
+|---|---|
+| Gráficos y métricas de mi aplicación | [Grafana en mi PC](http://localhost:3000/d/gmcomponents-ep3) |
+| Estado de los servicios | [Prometheus: servicios disponibles](http://localhost:9090/targets) |
+| Pruebas y reportes de GitHub | [EV3: gráficos, métricas y pruebas](https://github.com/iaketo/ia-components-devops/actions/workflows/ci.yml?query=branch%3Amain) |
+| Qué es Kubernetes y dónde verlo | [Guía de Kubernetes](monitoring/README.md#qué-es-kubernetes-y-dónde-verlo) |
+| Cómo ejecutarlo manualmente | [GitHub o mi PC Windows](monitoring/README.md#ejecutar-kubernetes-manualmente) |
+| Accesos para Windows | [Carpeta de accesos directos](monitoring/accesos-windows/) |
+
+Los enlaces `localhost` necesitan Docker y los servicios iniciados en tu PC. En GitHub se consultan ejecuciones y se descargan evidencias. Los ZIP nuevos tienen nombres numerados y un archivo **ABRIR-RESUMEN.html**; consulta el índice para identificar cada uno.
+
 ## Ejecutar y probar localmente
 
 Requisitos: Python 3.11, Docker con BuildKit y Docker Compose 2.24 o posterior. No requiere GPU.
@@ -93,9 +108,9 @@ Para ejecutar la auditoría local: `python scripts/audit_dependencies.py`. El id
 
 SonarQube se crea por ejecución, solo publica en loopback, cambia la contraseña inicial, analiza, espera el Quality Gate y elimina servidor y volúmenes al terminar. No requiere `SONAR_TOKEN` del equipo. La condición de seguridad usa todos los resultados de la ejecución, sin suprimir vulnerabilidades. El historial del servidor temporal no persiste: los reportes se conservan como artefactos de Actions.
 
-La imagen se etiqueta con `${{ github.sha }}` y lleva la etiqueta OCI `org.opencontainers.image.revision`. Los artefactos `quality-<SHA>` contienen JUnit, cobertura y auditorías; `deployment-<SHA>` contiene el ID de imagen, commit, estado de contenedores y logs; `kubernetes-<SHA>` conserva versión del clúster, recursos, eventos, logs y verificaciones de telemetría, alertas y recuperación. Esto vincula código, controles y despliegue de la misma ejecución. La imagen se carga directamente en kind con `kind load docker-image`. No se publica en un registry ni se crea un entorno productivo permanente. Compose se elimina antes de crear el clúster para liberar recursos y puertos; el clúster también se elimina al finalizar.
+La imagen se etiqueta con `${{ github.sha }}` y lleva la etiqueta OCI `org.opencontainers.image.revision`. Los artefactos nuevos se llaman `01-Pruebas-y-seguridad`, `02-Graficos-y-metricas-locales` y `03-Kubernetes-graficos-logs-y-alertas`. Conservan las pruebas, métricas, logs y comprobaciones de cada entorno. Todos incluyen `ABRIR-RESUMEN.html` y `REVISION.json` para identificar el commit y la ejecución; las descargas de ejecuciones antiguas mantienen sus nombres originales. Esto vincula código, controles y despliegue de la misma ejecución. La imagen se carga directamente en kind con `kind load docker-image`. No se publica en un registry ni se crea un entorno productivo permanente. Compose se elimina antes de crear el clúster para liberar recursos y puertos; el clúster también se elimina al finalizar.
 
-Para validar los servicios reales desde Actions, crea el secreto de repositorio `GROQ_API_KEY` (y opcionalmente `SERP_API_KEY`) en Settings → Secrets and variables → Actions. Ejecuta manualmente CI-CD con `live_validation=true`. La ejecución falla si falta la clave o fallan los servicios; no se omite silenciosamente esa comprobación. Los PR y el despliegue simulado estándar no reciben secretos ni dependen de servicios externos.
+Para validar los servicios reales desde Actions, crea el secreto de repositorio `GROQ_API_KEY` (y opcionalmente `SERP_API_KEY`) en Settings → Secrets and variables → Actions. Ejecuta manualmente el workflow `ci.yml` con `live_validation=true`. La ejecución falla si falta la clave o fallan los servicios; no se omite silenciosamente esa comprobación. Los PR y el despliegue simulado estándar no reciben secretos ni dependen de servicios externos.
 
 Configura además una regla de protección para `main` y `develop` que exija PR y los checks del workflow antes del merge. El README describe esa política; su aplicación debe verificarse en Settings del repositorio, no se obtiene solo con este archivo.
 

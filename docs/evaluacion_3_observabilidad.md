@@ -1,5 +1,9 @@
 # Evaluación Parcial 3: observabilidad y cumplimiento
 
+## Acceso a los servicios y reportes
+
+El [índice de servicios y paneles](../monitoring/README.md) reúne los accesos a Grafana, Prometheus, logs, alertas y Kubernetes, con instrucciones para Windows y ejecución manual en GitHub. Los paquetes nuevos están numerados y contienen `ABRIR-RESUMEN.html` para abrir las evidencias en el navegador, además de `REVISION.json` para identificar el commit y la ejecución. Los artefactos de ejecuciones antiguas conservan los prefijos `quality-`, `deployment-`, `kubernetes-` y `blocking-demo-`.
+
 ## Alcance y pauta
 
 Base revisada: `main`, commit `5409e88` (EP3 parcial sobre EP2 fusionada). Se conservan los tests funcionales, cobertura mínima de 80%, auditoría completa de dependencias, SonarQube temporal, imagen por SHA, dos réplicas, gateway y smoke tests. Se extiende ese pipeline; no se reemplaza.
@@ -20,16 +24,16 @@ El alcance ahora cubre los seis indicadores. El destino autorizado es Kubernetes
 1. `quality` instala las dependencias CPU y ejecuta tests con cobertura y JUnit. `normalize_coverage.py` regenera el XML a partir de las mismas mediciones, con rutas relativas inequívocas para SonarQube y el mismo umbral >=80%; no altera líneas ejecutadas ni elimina archivos.
 2. Entre los tests, `tests/test_ep3.py` ejecuta el gate con evidencia sintética aprobada y seis variantes rechazadas: cobertura 79%, vulnerabilidad, SonarQube ERROR, paquete omitido, reporte ausente y JSON corrupto. Si el gate acepta un caso negativo, falla pytest y se bloquea el despliegue.
 3. La auditoría real de dependencias y SonarQube mantienen sus bloqueos originales. Después, `compliance_gate.py` verifica sus reportes reales junto con `coverage.xml`. Error de formato, ausencia de evidencia o incumplimiento devuelve 1. El reporte queda en `reports/compliance.json`.
-4. Se conserva `quality-<SHA>` incluso ante fallas. Incluye JUnit, cobertura, auditoría, SonarQube y `negative-gate-tests/*.json`. Los reportes de prueba negativa se separan de los de análisis real.
+4. Se conserva `01-Pruebas-y-seguridad` incluso ante fallas. Incluye JUnit, cobertura, auditoría, SonarQube y `negative-gate-tests/*.json`. Los reportes de prueba negativa se separan de los de análisis real.
 5. `docker-deploy`, con `needs: quality`, descarga la cobertura de ese mismo workflow/commit. Valida Prometheus con `promtool`, construye la imagen por SHA y despliega dos réplicas, gateway y el complemento de monitoreo.
 6. El reloj comienza inmediatamente antes de `compose up`. Después de health y smoke de ambas réplicas, `ci_metrics.py` convierte la cobertura XML y los segundos transcurridos a formato Prometheus. La duración incluye el arranque del stack y los smoke tests; excluye construcción de imagen y validación externa opcional.
 7. `curl --fail` publica estas métricas en Pushgateway. `check_monitoring.py` exige dos targets de aplicación UP, sonda HTTP exitosa, cobertura >=80 y duración válida consultando Prometheus; Grafana debe responder y tener el dashboard provisionado. Cualquier fallo bloquea el job.
-8. `deployment-<SHA>` conserva la evidencia Compose. Ese stack se elimina antes de crear Kubernetes para liberar puertos y memoria.
+8. `02-Graficos-y-metricas-locales` conserva la evidencia Compose. Ese stack se elimina antes de crear Kubernetes para liberar puertos y memoria.
 9. kind crea un clúster Kubernetes 1.34.0 en el mismo runner cloud. `kind load docker-image` carga la imagen ya construida y verificada. No se reconstruye otro código para Kubernetes.
 10. `deploy_kubernetes.sh` aplica recursos y configuración, espera todos los despliegues y abre túneles locales de diagnóstico. La imagen se identifica por SHA; el Deployment registra esa revisión en una anotación. La aplicación no necesita acceso a la API de Kubernetes. Solo Alloy usa un ServiceAccount con permisos de lectura de pods/logs en el namespace.
 11. Los smoke tests se repiten dentro de ambos pods. La cobertura y el tiempo de despliegue Kubernetes se publican en su Pushgateway; `check_monitoring.py` verifica la recepción real por Prometheus.
 12. `check_kubernetes.py` exige contadores/histogramas, recursos y logs de ambos pods, dashboard y fuentes Prometheus/Loki. Escala el gateway a cero, comprueba sonda fallida, alerta crítica y recepción en Alertmanager; luego restaura el gateway. Elimina un pod de aplicación y exige su reemplazo por uno con otro UID, dos pods listos y dos exporters UP.
-13. `kubernetes-<SHA>` conserva recursos, versión del clúster, eventos, logs y `runtime-verification.json`, incluidos tiempos observados y entorno de ejecución. El clúster se elimina incluso si una comprobación falla.
+13. `03-Kubernetes-graficos-logs-y-alertas` conserva recursos, versión del clúster, eventos, logs y `runtime-verification.json`, incluidos tiempos observados y entorno de ejecución. El clúster se elimina incluso si una comprobación falla.
 
 No se suprimen vulnerabilidades ni se baja la cobertura. SonarQube sigue bloqueando vulnerabilidades y violaciones críticas/blocker. Los controles protegen este pipeline; impedir pushes directos o merges sin checks requiere reglas de GitHub adicionales, pendientes de configuración del equipo.
 
@@ -135,7 +139,7 @@ Los Deployments usan readiness/liveness/startup probes, límites de CPU/memoria,
 - La validación funcional de CI usa servicios externos simulados de manera explícita; FAISS, memoria, aplicación, contenedores, Kubernetes, métricas y logs son reales. La opción `live_validation` previa se conserva para exigir catálogo/embeddings/Groq reales cuando se proporcione el secreto correspondiente en Actions.
 - También pasó el smoke local con catálogo, embeddings y Groq reales, usando `GROQ_MODEL=openai/gpt-oss-120b`. Se verificaron FAISS, análisis, caché, chat y cinco páginas. `GROQ_MODEL` es un identificador de modelo; `GROQ_API_KEY` es la credencial. El código rechaza una clave colocada en la variable de modelo sin mostrar su contenido.
 - No se configuraron reglas remotas de branch protection ni se declara certificación normativa. El cumplimiento de esta evaluación se implementa mediante scripts y gates automatizados; las conclusiones/reflexiones individuales deben escribirlas los integrantes.
-- Validación local: 38 pruebas aprobadas, cobertura 94,67%, análisis de configuración y auditoría de dependencias. El resultado definitivo del despliegue corresponde al workflow del commit publicado. Revisar los artefactos `quality-*`, `deployment-*`, `kubernetes-*` y el workflow negativo independiente; un pipeline anterior verde no valida estos cambios.
+- Validación local: 38 pruebas aprobadas, cobertura 94,67%, análisis de configuración y auditoría de dependencias. El resultado definitivo del despliegue corresponde al workflow del commit publicado. Revisar los artefactos `01-Pruebas-y-seguridad`, `02-Graficos-y-metricas-locales`, `03-Kubernetes-graficos-logs-y-alertas` y el workflow negativo independiente; un pipeline anterior verde no valida estos cambios.
 
 ## Declaración de IA
 

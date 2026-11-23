@@ -1,6 +1,6 @@
 {
   "uid": "gmcomponents-ep3",
-  "title": "GM Components \u00b7 EP3",
+  "title": "Graficos y metricas de la aplicacion - Docker Compose",
   "schemaVersion": 41,
   "version": 1,
   "refresh": "5s",
@@ -9,8 +9,10 @@
     "to": "now"
   },
   "tags": [
+    "DevOps",
     "EP3",
-    "DevOps"
+    "EV3",
+    "Graficos y monitoreo"
   ],
   "panels": [
     {
@@ -44,7 +46,7 @@
     },
     {
       "id": 2,
-      "title": "R\u00e9plicas con m\u00e9tricas",
+      "title": "Réplicas con métricas",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -102,7 +104,7 @@
     },
     {
       "id": 4,
-      "title": "Duraci\u00f3n despliegue (sin build)",
+      "title": "Duración despliegue (sin build)",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -131,7 +133,7 @@
     },
     {
       "id": 5,
-      "title": "CPU por r\u00e9plica (n\u00facleos)",
+      "title": "CPU por réplica (núcleos)",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -160,7 +162,7 @@
     },
     {
       "id": 6,
-      "title": "Memoria residente por r\u00e9plica",
+      "title": "Memoria residente por réplica",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -276,7 +278,7 @@
     },
     {
       "id": 10,
-      "title": "\u00daltima publicaci\u00f3n de CI",
+      "title": "Última publicación de CI",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -304,5 +306,19 @@
       "options": {}
     }
   ],
-  "description": "Sin datos significa que a\u00fan no se recibi\u00f3 evidencia. Logs y trace_id en Streamlit y docker compose logs."
+  "description": "Sin datos significa que aún no se recibió evidencia. Logs y trace_id en Streamlit y docker compose logs.",
+  "links": [
+    {
+      "type": "link",
+      "title": "Servicios y paneles: guia de acceso",
+      "url": "https://github.com/iaketo/ia-components-devops/blob/main/monitoring/README.md",
+      "targetBlank": true
+    },
+    {
+      "type": "link",
+      "title": "Estado de los servicios - Prometheus",
+      "url": "http://localhost:9090/targets",
+      "targetBlank": true
+    }
+  ]
 }

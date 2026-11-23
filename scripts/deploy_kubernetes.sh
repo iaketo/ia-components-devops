@@ -5,7 +5,7 @@ set -euo pipefail
 [[ "$APP_IMAGE" =~ ^[a-zA-Z0-9._/:-]+$ ]] || { echo 'Imagen inválida' >&2; exit 1; }
 namespace=gmcomponents
 mkdir -p reports/kubernetes
-kubectl apply -f <(sed "s|gmcomponents-app:ep3|$APP_IMAGE|g" deploy/kubernetes/resources.yaml)
+sed "s|gmcomponents-app:ep3|$APP_IMAGE|g" deploy/kubernetes/resources.yaml | kubectl apply -f -
 configmap() {
   kubectl -n "$namespace" create configmap "$@" --dry-run=client -o yaml | kubectl apply -f -
 }

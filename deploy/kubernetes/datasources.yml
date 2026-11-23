@@ -1,13 +1,13 @@
 apiVersion: 1
 datasources:
-  - name: Prometheus
+  - name: Metricas de la aplicacion (Prometheus)
     uid: prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090
     isDefault: true
     editable: false
-  - name: Loki
+  - name: Registros de la aplicacion (Loki)
     uid: loki
     type: loki
     access: proxy

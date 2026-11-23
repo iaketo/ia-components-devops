@@ -1,6 +1,7 @@
 apiVersion: 1
 providers:
   - name: EP3
+    folder: EV3 - Graficos y monitoreo
     type: file
     disableDeletion: true
     options:

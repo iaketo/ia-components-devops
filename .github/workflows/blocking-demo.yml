@@ -1,4 +1,4 @@
-name: EP3 - Demostración de bloqueo
+name: EV3 - Demostracion de bloqueo (fallo esperado)
 
 on:
   push:
@@ -35,12 +35,15 @@ jobs:
           --audit reports/blocking-demo/dependency-audit.json
           --sonar reports/blocking-demo/sonarqube.json
           --output reports/blocking-demo/compliance.json
+      - name: Preparar resumen de la demostracion
+        if: always()
+        run: python scripts/package_reports.py --kind blocking --source reports/blocking-demo --output reports/paquete-bloqueo
       - name: Conservar evidencia incluso cuando se bloquea
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: blocking-demo-${{ github.sha }}-${{ github.run_id }}
-          path: reports/blocking-demo/
+          name: 04-Demostracion-de-bloqueo
+          path: reports/paquete-bloqueo/
           if-no-files-found: error
 
   deployment:
