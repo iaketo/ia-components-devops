@@ -58,7 +58,7 @@ jobs:
         run: python scripts/package_reports.py --kind quality --source reports --output reports/paquete-calidad --coverage coverage.xml
       - name: Conservar resultados de calidad y seguridad
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: 01-Pruebas-y-seguridad
           path: reports/paquete-calidad/
@@ -128,7 +128,7 @@ jobs:
         run: python scripts/package_reports.py --kind compose --source reports --output reports/paquete-local
       - name: Publicar evidencia vinculada al commit
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: 02-Graficos-y-metricas-locales
           path: reports/paquete-local/
