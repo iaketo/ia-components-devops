@@ -2,7 +2,7 @@
   "uid": "gmcomponents-ep3",
   "title": "Graficos y metricas de la aplicacion - Docker Compose",
   "schemaVersion": 41,
-  "version": 1,
+  "version": 2,
   "refresh": "5s",
   "time": {
     "from": "now-15m",
@@ -301,6 +301,39 @@
           "expr": "push_time_seconds{job=\"gmcomponents-ci\"}",
           "refId": "A",
           "legendFormat": "{{instance}} {{status}}"
+        }
+      ],
+      "options": {}
+    },
+    {
+      "id": 11,
+      "title": "Tasa de errores del agente",
+      "description": "Porcentaje de ejecuciones fallidas durante los ultimos 5 minutos.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * (sum(rate(gm_agent_runs_total{status=\"error\",source=\"app\"}[5m])) or vector(0)) / (sum(rate(gm_agent_runs_total{source=\"app\"}[5m])) > 0)",
+          "refId": "A",
+          "legendFormat": "Errores (%)"
         }
       ],
       "options": {}
