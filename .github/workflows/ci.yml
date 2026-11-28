@@ -1,184 +1,493 @@
-name: EV3 - Graficos, metricas y pruebas
-run-name: EV3 - Revision y paneles - ${{ github.ref_name }}
-
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
-  workflow_dispatch:
-    inputs:
-      live_validation:
-        description: Validar también catálogo, embeddings y Groq reales (requiere GROQ_API_KEY)
-        type: boolean
-        default: false
-
+name: GM Components - CI/CD
+run-name: GM Components - ${{ github.ref_name }}
 permissions:
   contents: read
-
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
-  quality:
-    name: 01 - Pruebas y seguridad
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: pip
-          cache-dependency-path: 'requirements*.txt'
-      - name: Instalar dependencias CPU y herramientas de calidad
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.14.1+cpu'
-          python -m pip install -r requirements-dev.txt
-          python -m pip check
-      - name: Pruebas unitarias y funcionales con cobertura
-        env:
-          OMP_NUM_THREADS: '2'
-        run: >-
-          python -m pytest tests/ -v --junitxml=reports/tests.xml
-          --cov=agent --cov=services --cov=memory --cov=observability --cov=utils
-          --cov-report=xml:coverage.xml --cov-report=term --cov-fail-under=80
-      - name: Normalizar rutas del reporte para SonarQube
-        run: python scripts/normalize_coverage.py
-      - name: Bloquear vulnerabilidades de dependencias
-        run: python scripts/audit_dependencies.py
-      - name: SonarQube y Quality Gate obligatorio
-        run: python scripts/sonarqube_gate.py
-      - name: Verificar política de cumplimiento con evidencia completa
-        run: python scripts/compliance_gate.py
-      - name: Preparar resumen de pruebas y seguridad
-        if: always()
-        run: python scripts/package_reports.py --kind quality --source reports --output reports/paquete-calidad --coverage coverage.xml
-      - name: Conservar resultados de calidad y seguridad
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: 01-Pruebas-y-seguridad
-          path: reports/paquete-calidad/
-          if-no-files-found: warn
-
-  docker-deploy:
-    name: 02 - Paneles y monitoreo (Compose y Kubernetes)
-    needs: quality
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
+  validate:
+    name: 01 - Validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     env:
       COMPOSE_FILE: docker-compose.yml:docker-compose.monitoring.yml
       APP_IMAGE: gmcomponents-ev2:${{ github.sha }}
       VCS_REF: ${{ github.sha }}
       COMPOSE_PROJECT_NAME: gmcomponents-ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Recuperar cobertura del mismo commit
-        uses: actions/download-artifact@v4
-        with:
-          name: 01-Pruebas-y-seguridad
-          path: quality-evidence
-      - name: Validar configuración de Prometheus y alertas
-        run: |
-          docker compose run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
-          docker compose run --rm --no-deps -v "$PWD/monitoring/alerts.test.yml:/etc/prometheus/alerts.test.yml:ro" --entrypoint promtool prometheus test rules /etc/prometheus/alerts.test.yml
-      - name: Validar orquestación
-        run: docker compose config --quiet
-      - name: Construir imagen identificada por commit
-        run: docker compose build gmcomponents
-      - name: Desplegar dos réplicas detrás del gateway
-        run: |
-          echo "DEPLOY_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
-          docker compose up -d --no-build --scale gmcomponents=2 --wait --wait-timeout 180
-      - name: Comprobar gateway y cada réplica
-        run: |
-          curl --fail --silent http://127.0.0.1:8501/_stcore/health
-          docker compose exec -T --index 1 gmcomponents python scripts/smoke_test.py
-          docker compose exec -T --index 2 gmcomponents python scripts/smoke_test.py
-      - name: Publicar métricas de cobertura y despliegue y comprobar monitoreo
-        run: |
-          python scripts/ci_metrics.py --coverage quality-evidence/coverage.xml --deployment-seconds "$(( $(date +%s) - DEPLOY_STARTED_AT ))"
-          curl --fail --silent --show-error --retry 5 --retry-connrefused --data-binary @reports/ci-metrics.prom http://127.0.0.1:9091/metrics/job/gmcomponents-ci
-          python scripts/check_monitoring.py
-          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:3000/api/health > reports/grafana-health.json
-          curl --fail --silent http://127.0.0.1:3000/api/dashboards/uid/gmcomponents-ep3 > reports/grafana-dashboard.json
-      - name: Validar servicios externos reales cuando se solicite
-        if: github.event_name == 'workflow_dispatch' && inputs.live_validation
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          SERP_API_KEY: ${{ secrets.SERP_API_KEY }}
-        run: |
-          python -c 'import os; assert os.getenv("GROQ_API_KEY"), "Falta el secreto GROQ_API_KEY en GitHub Actions"'
-          docker compose run --rm --no-deps -e GROQ_API_KEY -e SERP_API_KEY gmcomponents python scripts/smoke_test.py --live
-      - name: Guardar evidencia de despliegue
-        if: always()
-        run: |
-          mkdir -p reports
-          docker compose ps --all --format json > reports/containers.json
-          docker compose logs --no-color > reports/deployment.log
-          docker image inspect "$APP_IMAGE" --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}' > reports/image.txt
-      - name: Preparar resumen de graficos y metricas locales
-        if: always()
-        run: python scripts/package_reports.py --kind compose --source reports --output reports/paquete-local
-      - name: Publicar evidencia vinculada al commit
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: 02-Graficos-y-metricas-locales
-          path: reports/paquete-local/
-      - name: Limpiar entorno simulado
-        if: always()
-        run: docker compose down --volumes --remove-orphans
-
-      - name: Crear Kubernetes efímero en el runner cloud
-        uses: helm/kind-action@v1.12.0
-        with:
-          version: v0.30.0
-          kubectl_version: v1.34.0
-          node_image: kindest/node:v1.34.0
-          cluster_name: gmcomponents
-          config: deploy/kubernetes/kind.yaml
-          wait: 120s
-      - name: Desplegar imagen verificada y observabilidad en Kubernetes
-        env:
-          EP3_SELF_TEST: 'true'
-        run: |
-          echo "KUBE_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
-          kind load docker-image "$APP_IMAGE" --name gmcomponents
-          bash scripts/deploy_kubernetes.sh
-      - name: Validar funcionalidad en ambos pods
-        run: |
-          for pod in $(kubectl -n gmcomponents get pods -l app=gmcomponents -o jsonpath='{.items[*].metadata.name}'); do
-            kubectl -n gmcomponents exec "$pod" -- python scripts/smoke_test.py
-          done
-      - name: Publicar evidencia CI y verificar métricas, logs, alertas y recuperación
-        run: |
-          python scripts/ci_metrics.py --coverage quality-evidence/coverage.xml --deployment-seconds "$(( $(date +%s) - KUBE_STARTED_AT ))" --output reports/kubernetes/ci-metrics.prom
-          curl --fail --silent --show-error --retry 10 --retry-connrefused --data-binary @reports/kubernetes/ci-metrics.prom http://127.0.0.1:9091/metrics/job/gmcomponents-ci
-          python scripts/check_monitoring.py --output reports/kubernetes/monitoring.json
-          python scripts/check_kubernetes.py
-      - name: Recoger evidencia Kubernetes del commit
-        if: always()
-        run: bash scripts/collect_kubernetes.sh
-      - name: Preparar resumen de Kubernetes, logs y alertas
-        if: always()
-        run: python scripts/package_reports.py --kind kubernetes --source reports/kubernetes --output reports/paquete-kubernetes
-      - name: Conservar evidencia Kubernetes
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: 03-Kubernetes-graficos-logs-y-alertas
-          path: reports/paquete-kubernetes/
-          if-no-files-found: warn
-      - name: Eliminar el clúster efímero
-        if: always()
-        run: |
-          if command -v kind >/dev/null 2>&1; then
-            kind delete cluster --name gmcomponents
-          fi
+    - uses: actions/checkout@v4
+    - name: Validar configuración de Prometheus y alertas
+      run: |
+        docker compose run --rm --no-deps --entrypoint promtool prometheus check config /etc/prometheus/prometheus.yml
+        docker compose run --rm --no-deps -v "$PWD/monitoring/alerts.test.yml:/etc/prometheus/alerts.test.yml:ro" --entrypoint promtool prometheus test rules /etc/prometheus/alerts.test.yml
+    - name: Validar orquestación
+      run: docker compose config --quiet
+  tests:
+    name: 02 - Tests and Coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: validate
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: pip
+        cache-dependency-path: requirements*.txt
+    - name: Instalar dependencias CPU y herramientas de calidad
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --index-url https://download.pytorch.org/whl/cpu 'torch==2.14.1+cpu'
+        python -m pip install -r requirements-dev.txt
+        python -m pip check
+    - name: Registrar versiones instaladas en Tests
+      run: |-
+        mkdir -p reports
+        python - <<'PYINVENTORY'
+        from importlib.metadata import distributions
+        from pathlib import Path
+        packages = {}
+        for package in distributions():
+            name = package.metadata['Name']
+            version = package.version
+            if name.lower() == 'torch' and version.endswith('+cpu'):
+                version = version.removesuffix('+cpu')
+            packages[name] = version
+        Path('reports/audit-requirements.txt').write_text(''.join(f'{name}=={version}\n' for name, version in sorted(packages.items())))
+        PYINVENTORY
+    - name: Pruebas unitarias y funcionales con cobertura
+      env:
+        OMP_NUM_THREADS: '2'
+      run: python -m pytest tests/ -v --junitxml=reports/tests.xml --cov=agent --cov=services --cov=memory --cov=observability
+        --cov=utils --cov-report=xml:coverage.xml --cov-report=term --cov-fail-under=80
+    - name: Normalizar rutas del reporte para SonarQube
+      run: python scripts/normalize_coverage.py
+    - name: Guardar test-reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-reports
+        path: |-
+          coverage.xml
+          reports/tests.xml
+          reports/audit-requirements.txt
+        if-no-files-found: warn
+      if: always()
+  security:
+    name: 03 - Security Audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: tests
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Recuperar test-reports
+      uses: actions/download-artifact@v4
+      with:
+        name: test-reports
+        path: .
+    - name: Auditar el inventario exacto de Tests
+      run: |-
+        python -m pip install 'pip-audit>=2.9,<3'
+        python -m pip_audit -r reports/audit-requirements.txt --disable-pip --no-deps --format json --output reports/dependency-audit.json --progress-spinner off
+        python - <<'PYAUDIT'
+        import json
+        from pathlib import Path
+        report = json.loads(Path('reports/dependency-audit.json').read_text())
+        assert report['dependencies'], 'Auditoria vacia'
+        assert all(not p.get('skip_reason') for p in report['dependencies']), 'Auditoria incompleta'
+        PYAUDIT
+    - name: Guardar security-reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-reports
+        path: |-
+          reports/dependency-audit.json
+          reports/audit-requirements.txt
+        if-no-files-found: warn
+      if: always()
+  sonar:
+    name: 04 - SonarQube
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: tests
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Recuperar test-reports
+      uses: actions/download-artifact@v4
+      with:
+        name: test-reports
+        path: .
+    - name: SonarQube y Quality Gate obligatorio
+      run: python scripts/sonarqube_gate.py
+    - name: Guardar sonar-reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: sonar-reports
+        path: |-
+          reports/sonarqube.json
+          reports/sonarqube-issues.json
+          reports/sonarqube-server.log
+        if-no-files-found: warn
+      if: always()
+  quality:
+    name: 05 - Quality Gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs:
+    - tests
+    - security
+    - sonar
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Recuperar test-reports
+      uses: actions/download-artifact@v4
+      with:
+        name: test-reports
+        path: .
+    - name: Recuperar security-reports
+      uses: actions/download-artifact@v4
+      with:
+        name: security-reports
+        path: reports
+    - name: Recuperar sonar-reports
+      uses: actions/download-artifact@v4
+      with:
+        name: sonar-reports
+        path: reports
+    - name: Verificar política de cumplimiento con evidencia completa
+      run: python scripts/compliance_gate.py
+    - name: Preparar resumen de pruebas y seguridad
+      if: always()
+      run: python scripts/package_reports.py --kind quality --source reports --output reports/paquete-calidad --coverage coverage.xml
+    - name: Conservar resultados de calidad y seguridad
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: 01-Pruebas-y-seguridad
+        path: reports/paquete-calidad/
+        if-no-files-found: warn
+  build:
+    name: 06 - Build Docker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: quality
+    env:
+      COMPOSE_FILE: docker-compose.yml:docker-compose.monitoring.yml
+      APP_IMAGE: gmcomponents-ev2:${{ github.sha }}
+      VCS_REF: ${{ github.sha }}
+      COMPOSE_PROJECT_NAME: gmcomponents-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Construir imagen identificada por commit
+      run: docker compose build gmcomponents
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Auditar dependencias de la imagen AMD64
+      run: |-
+        set -euo pipefail
+        mkdir -p reports
+         test "$(docker image inspect "$APP_IMAGE" --format '{{.Architecture}}')" = amd64
+         docker run --rm --entrypoint python "$APP_IMAGE" -c 'from importlib.metadata import distributions; print("\n".join(sorted(p.metadata["Name"]+"=="+p.version.removesuffix("+cpu") if p.metadata["Name"].lower()=="torch" else p.metadata["Name"]+"=="+p.version for p in distributions())))' > reports/image-requirements.txt
+        python -m pip install 'pip-audit>=2.9,<3'
+        python -m pip_audit -r reports/image-requirements.txt --disable-pip --no-deps --format json --output reports/image-audit.json --progress-spinner off
+        python - <<'PY'
+        import json
+        from pathlib import Path
+        r = json.loads(Path('reports/image-audit.json').read_text())
+        assert r['dependencies'] and all(not d.get('skip_reason') for d in r['dependencies'])
+        PY
+    - name: Guardar 05-Auditoria-imagen-AMD64
+      uses: actions/upload-artifact@v4
+      with:
+        name: 05-Auditoria-imagen-AMD64
+        path: |-
+          reports/image-requirements.txt
+          reports/image-audit.json
+        if-no-files-found: warn
+      if: always()
+    - name: Exportar imagen del commit
+      run: |-
+        set -o pipefail
+        docker save "$APP_IMAGE" | gzip -1 > "$RUNNER_TEMP/gmcomponents-image.tar.gz"
+    - name: Guardar imagen-docker
+      uses: actions/upload-artifact@v4
+      with:
+        name: imagen-docker
+        path: ${{ runner.temp }}/gmcomponents-image.tar.gz
+        if-no-files-found: error
+        retention-days: 1
+  integration:
+    name: 07 - Integration Tests and Agent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: build
+    env:
+      COMPOSE_FILE: docker-compose.yml:docker-compose.monitoring.yml
+      APP_IMAGE: gmcomponents-ev2:${{ github.sha }}
+      VCS_REF: ${{ github.sha }}
+      COMPOSE_PROJECT_NAME: gmcomponents-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Recuperar cobertura del mismo commit
+      uses: actions/download-artifact@v4
+      with:
+        name: 01-Pruebas-y-seguridad
+        path: quality-evidence
+    - name: Recuperar imagen-docker
+      uses: actions/download-artifact@v4
+      with:
+        name: imagen-docker
+        path: ${{ runner.temp }}
+    - name: Cargar imagen verificada
+      run: |-
+        docker load --input "$RUNNER_TEMP/gmcomponents-image.tar.gz"
+        test "$(docker image inspect "$APP_IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$VCS_REF"
+    - name: Desplegar dos réplicas detrás del gateway
+      run: |
+        echo "DEPLOY_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+        docker compose up -d --no-build --scale gmcomponents=2 --wait --wait-timeout 180
+    - name: Comprobar gateway y cada réplica
+      run: |
+        curl --fail --silent http://127.0.0.1:8501/_stcore/health
+        docker compose exec -T --index 1 gmcomponents python scripts/smoke_test.py
+        docker compose exec -T --index 2 gmcomponents python scripts/smoke_test.py
+    - name: Publicar métricas de cobertura y despliegue y comprobar monitoreo
+      run: |
+        python scripts/ci_metrics.py --coverage quality-evidence/coverage.xml --deployment-seconds "$(( $(date +%s) - DEPLOY_STARTED_AT ))"
+        curl --fail --silent --show-error --retry 5 --retry-connrefused --data-binary @reports/ci-metrics.prom http://127.0.0.1:9091/metrics/job/gmcomponents-ci
+        python scripts/check_monitoring.py
+        curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:3000/api/health > reports/grafana-health.json
+        curl --fail --silent http://127.0.0.1:3000/api/dashboards/uid/gmcomponents-ep3 > reports/grafana-dashboard.json
+    - name: Validar servicios externos reales cuando se solicite
+      if: github.event_name == 'workflow_dispatch' && inputs.live_validation
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        SERP_API_KEY: ${{ secrets.SERP_API_KEY }}
+      run: |
+        python -c 'import os; assert os.getenv("GROQ_API_KEY"), "Falta el secreto GROQ_API_KEY en GitHub Actions"'
+        docker compose run --rm --no-deps -e GROQ_API_KEY -e SERP_API_KEY gmcomponents python scripts/smoke_test.py --live
+    - name: Guardar evidencia de despliegue
+      if: always()
+      run: |
+        mkdir -p reports
+        docker compose ps --all --format json > reports/containers.json
+        docker compose logs --no-color > reports/deployment.log
+        docker image inspect "$APP_IMAGE" --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}' > reports/image.txt
+    - name: Preparar resumen de graficos y metricas locales
+      if: always()
+      run: python scripts/package_reports.py --kind compose --source reports --output reports/paquete-local
+    - name: Publicar evidencia vinculada al commit
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: 02-Graficos-y-metricas-locales
+        path: reports/paquete-local/
+    - name: Limpiar entorno simulado
+      if: always()
+      run: docker compose down --volumes --remove-orphans
+  kubernetes:
+    name: 08 - Kubernetes and Observability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    needs: build
+    env:
+      COMPOSE_FILE: docker-compose.yml:docker-compose.monitoring.yml
+      APP_IMAGE: gmcomponents-ev2:${{ github.sha }}
+      VCS_REF: ${{ github.sha }}
+      COMPOSE_PROJECT_NAME: gmcomponents-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Recuperar cobertura del mismo commit
+      uses: actions/download-artifact@v4
+      with:
+        name: 01-Pruebas-y-seguridad
+        path: quality-evidence
+    - name: Recuperar imagen-docker
+      uses: actions/download-artifact@v4
+      with:
+        name: imagen-docker
+        path: ${{ runner.temp }}
+    - name: Cargar imagen verificada
+      run: |-
+        docker load --input "$RUNNER_TEMP/gmcomponents-image.tar.gz"
+        test "$(docker image inspect "$APP_IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$VCS_REF"
+    - name: Crear Kubernetes efímero en el runner cloud
+      uses: helm/kind-action@v1.12.0
+      with:
+        version: v0.30.0
+        kubectl_version: v1.34.0
+        node_image: kindest/node:v1.34.0
+        cluster_name: gmcomponents
+        config: deploy/kubernetes/kind.yaml
+        wait: 120s
+    - name: Desplegar imagen verificada y observabilidad en Kubernetes
+      env:
+        EP3_SELF_TEST: 'true'
+      run: |
+        echo "KUBE_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+        kind load docker-image "$APP_IMAGE" --name gmcomponents
+        bash scripts/deploy_kubernetes.sh
+    - name: Validar funcionalidad en ambos pods
+      run: |
+        for pod in $(kubectl -n gmcomponents get pods -l app=gmcomponents -o jsonpath='{.items[*].metadata.name}'); do
+          kubectl -n gmcomponents exec "$pod" -- python scripts/smoke_test.py
+        done
+    - name: Publicar evidencia CI y verificar métricas, logs, alertas y recuperación
+      run: |
+        python scripts/ci_metrics.py --coverage quality-evidence/coverage.xml --deployment-seconds "$(( $(date +%s) - KUBE_STARTED_AT ))" --output reports/kubernetes/ci-metrics.prom
+        curl --fail --silent --show-error --retry 10 --retry-connrefused --data-binary @reports/kubernetes/ci-metrics.prom http://127.0.0.1:9091/metrics/job/gmcomponents-ci
+        python scripts/check_monitoring.py --output reports/kubernetes/monitoring.json
+        python scripts/check_kubernetes.py
+    - name: Recoger evidencia Kubernetes del commit
+      if: always()
+      run: bash scripts/collect_kubernetes.sh
+    - name: Preparar resumen de Kubernetes, logs y alertas
+      if: always()
+      run: python scripts/package_reports.py --kind kubernetes --source reports/kubernetes --output reports/paquete-kubernetes
+    - name: Conservar evidencia Kubernetes
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: 03-Kubernetes-graficos-logs-y-alertas
+        path: reports/paquete-kubernetes/
+        if-no-files-found: warn
+    - name: Eliminar el clúster efímero
+      if: always()
+      run: |
+        if command -v kind >/dev/null 2>&1; then
+          kind delete cluster --name gmcomponents
+        fi
+  release:
+    name: 09 - Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs:
+    - integration
+    - kubernetes
+    env:
+      COMPOSE_FILE: docker-compose.yml:docker-compose.monitoring.yml
+      APP_IMAGE: gmcomponents-ev2:${{ github.sha }}
+      VCS_REF: ${{ github.sha }}
+      COMPOSE_PROJECT_NAME: gmcomponents-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+    - name: Recuperar imagen-docker
+      uses: actions/download-artifact@v4
+      with:
+        name: imagen-docker
+        path: ${{ runner.temp }}
+    - name: Cargar imagen verificada
+      run: |-
+        docker load --input "$RUNNER_TEMP/gmcomponents-image.tar.gz"
+        test "$(docker image inspect "$APP_IMAGE" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$VCS_REF"
+    - name: Publicar imagen aprobada en GHCR
+      id: publish
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |-
+        set -euo pipefail
+        image="ghcr.io/${GITHUB_REPOSITORY,,}:sha-$GITHUB_SHA"
+        printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        docker tag "$APP_IMAGE" "$image"
+        docker push "$image"
+        reference=$(docker image inspect "$image" --format '{{range .RepoDigests}}{{println .}}{{end}}' | grep "^ghcr.io/${GITHUB_REPOSITORY,,}@sha256:" | head -n1)
+        test -n "$reference"
+        echo "image=$reference" >> "$GITHUB_OUTPUT"
+        docker logout ghcr.io
+  deploy:
+    name: 10 - Deploy Azure (K3s)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    needs: release
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && vars.DEPLOY_ENABLED
+      == 'true'
+    environment:
+      name: production-demo
+      url: ${{ vars.DEMO_URL }}
+    concurrency:
+      group: gmcomponents-production-demo
+      cancel-in-progress: false
+    steps:
+    - uses: actions/checkout@v4
+    - name: Recuperar 01-Pruebas-y-seguridad
+      uses: actions/download-artifact@v4
+      with:
+        name: 01-Pruebas-y-seguridad
+        path: quality-evidence
+    - name: Deploy Azure and verify HTTPS
+      env:
+        AZURE_HOST: ${{ secrets.AZURE_HOST }}
+        AZURE_SSH_KEY: ${{ secrets.AZURE_SSH_KEY }}
+        AZURE_KNOWN_HOSTS: ${{ secrets.AZURE_KNOWN_HOSTS }}
+        DEMO_URL: ${{ vars.DEMO_URL }}
+        APP_IMAGE: ${{ needs.release.outputs.image }}
+      run: |-
+        set -euo pipefail
+        [[ "$AZURE_HOST" =~ ^[0-9.]+$ ]]
+        [[ "$APP_IMAGE" =~ ^ghcr\.io/iaketo/ia-components-devops@sha256:[a-f0-9]{64}$ ]]
+        [[ "$DEMO_URL" == https://* ]]
+        umask 077
+        key="$RUNNER_TEMP/azure-key"
+        known="$RUNNER_TEMP/azure-known-hosts"
+        printf '%s\n' "$AZURE_SSH_KEY" | tr -d '\r' > "$key"
+        printf '%s\n' "$AZURE_KNOWN_HOSTS" | tr -d '\r' > "$known"
+        trap 'rm -f "$key" "$known"' EXIT
+        ssh_args=(-i "$key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known" -o BatchMode=yes -o ConnectTimeout=15)
+        remote="azureuser@$AZURE_HOST"
+        work=$(ssh "${ssh_args[@]}" "$remote" 'mktemp -d /tmp/gmcomponents-deploy.XXXXXXXX')
+        [[ "$work" =~ ^/tmp/gmcomponents-deploy\.[A-Za-z0-9]+$ ]]
+        trap 'ssh "${ssh_args[@]}" "$remote" "sudo rm -rf -- $work" || true; rm -f "$key" "$known"' EXIT
+        cp quality-evidence/coverage.xml coverage.xml
+        tar -czf "$RUNNER_TEMP/azure-deploy.tar.gz" deploy/kubernetes monitoring scripts/deploy_azure.sh scripts/ci_metrics.py scripts/check_monitoring.py coverage.xml
+        scp "${ssh_args[@]}" "$RUNNER_TEMP/azure-deploy.tar.gz" "$remote:$work/bundle.tar.gz"
+        mkdir -p reports/azure
+        ssh "${ssh_args[@]}" "$remote" "cd $work && tar -xzf bundle.tar.gz && sudo env APP_IMAGE=$APP_IMAGE VCS_REF=$GITHUB_SHA bash scripts/deploy_azure.sh" | tee reports/azure/deployment.log
+        curl -fsS --max-time 15 --retry 18 --retry-delay 10 --retry-all-errors "${DEMO_URL%/}/_stcore/health" | tee reports/azure/public-health.txt
+        test "$(curl --max-time 15 -sS -o /dev/null -w '%{http_code}' "${DEMO_URL%/}/")" = 401
+        printf 'URL: %s\nSHA: %s\nImage: %s\n' "$DEMO_URL" "$GITHUB_SHA" "$APP_IMAGE" | tee reports/azure/release.txt
+        printf '\n### Azure deployment\n- URL: %s\n- Image: `%s`\n' "$DEMO_URL" "$APP_IMAGE" >> "$GITHUB_STEP_SUMMARY"
+    - name: Guardar 06-Despliegue-Azure
+      uses: actions/upload-artifact@v4
+      with:
+        name: 06-Despliegue-Azure
+        path: reports/azure/
+        if-no-files-found: warn
+      if: always()
+'on':
+  push:
+    branches:
+    - main
+    - develop
+  pull_request:
+    branches:
+    - main
+    - develop
+  workflow_dispatch:
+    inputs:
+      live_validation:
+        description: Validar también catálogo, embeddings y Groq reales (requiere GROQ_API_KEY)
+        type: boolean
+        default: false
